@@ -1,5 +1,5 @@
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy, Heart, Bookmark, Check, ArrowLeft, Share2, Star } from "lucide-react";
@@ -21,6 +21,7 @@ import { getProfile, getProfilesByIds } from "@/services/supabase/profiles";
 import { getLikeCount, getLikedPromptIds, isLiked as checkIsLiked } from "@/services/supabase/likes";
 import { getSavedPromptIds, isSaved as checkIsSaved } from "@/services/supabase/saves";
 import { getPromptRating, getUserPromptRating } from "@/services/supabase/ratings";
+import { recordViewIfEligible } from "@/lib/viewTracking";
 
 type PromptDetailData = PromptWithDetails & { userRating?: number | null };
 
@@ -42,17 +43,17 @@ export default function PromptDetail() {
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
-  // Count one view per prompt visited. The ref guards against double-firing
-  // under React StrictMode in development, and against re-counting when the
-  // query refetches — the effect only depends on the id in the URL.
-  const countedViewFor = useRef<string | null>(null);
+  // Count one view per prompt per visitor within the deduplication window (30m).
+  // Deduplication survives back-and-forth navigation, React StrictMode double mounts,
+  // and data refetches.
   useEffect(() => {
-    if (!id || countedViewFor.current === id) return;
-    countedViewFor.current = id;
+    if (!id) return;
 
-    import('@/services/supabase/prompts')
-      .then(({ incrementViewCount }) => incrementViewCount(id))
-      .catch((error) => console.error('Failed to record view:', error));
+    if (recordViewIfEligible(id)) {
+      import('@/services/supabase/prompts')
+        .then(({ incrementViewCount }) => incrementViewCount(id))
+        .catch((error) => console.error('Failed to record view:', error));
+    }
   }, [id]);
 
   const { data: prompt, isLoading } = useQuery<PromptDetailData | null>({

@@ -308,6 +308,9 @@ export async function incrementCopyCount(promptId: string): Promise<{ error: Pos
  * Backed by a SECURITY DEFINER function, because the UPDATE policy on
  * `prompts` only lets a row's owner write to it — but every viewer needs
  * to be able to bump this counter.
+ *
+ * Note: Callers should deduplicate views per visitor session/window using
+ * `recordViewIfEligible` in `@/lib/viewTracking` before calling this function.
  */
 export async function incrementViewCount(promptId: string): Promise<{ error: PostgrestError | null }> {
   const { error } = await supabase.rpc('increment_view_count', {
