@@ -387,7 +387,7 @@ export function PromptCard({
           className={cn(
             "absolute top-2 sm:top-3 left-2 sm:left-3 p-1.5 sm:p-2 rounded-full bg-background shadow-soft transition-all duration-200 touch-target flex items-center justify-center",
             "opacity-100 lg:opacity-0 lg:group-hover:opacity-100",
-            copied && "bg-green-500/90"
+            copied && "bg-success text-success-foreground"
           )}
           title="Copy prompt"
           aria-label={copied ? "Copied" : "Copy prompt"}

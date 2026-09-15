@@ -328,7 +328,7 @@ export default function Settings() {
                 />
                 <div
                   onClick={() => coverInputRef.current?.click()}
-                  className="relative w-full h-40 bg-secondary/50 rounded-sm overflow-hidden cursor-pointer group"
+                  className="relative w-full h-40 bg-secondary/50 rounded-xl overflow-hidden cursor-pointer group"
                 >
                   {(coverPreview || coverUrl) ? (
                     <>
