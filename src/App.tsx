@@ -8,6 +8,7 @@ import { ThemeProvider } from "next-themes";
 import { Loader2 } from "lucide-react";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/routing/ProtectedRoute";
+import { ScrollManager } from "@/components/routing/ScrollManager";
 
 // The feed is what most visits land on, so it ships in the main bundle. Paying
 // an extra round trip to fetch it as a chunk would slow down the common case.
@@ -63,6 +64,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <ScrollManager />
             <Suspense fallback={<RouteFallback />}>
               <Routes>
                 {/* Complete Profile - accessible to authenticated users with incomplete profiles */}

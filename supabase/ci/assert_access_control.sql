@@ -8,6 +8,9 @@
 --   3. public.follows select policy is not public (using true).
 --   4. public.saves select policy is not private to authenticated owners.
 --   5. public.feedback or public.prompt_reports have any select policy.
+--   6. public.prompt_uploads select policy is not owner-only, or has write policies.
+--   7. public.prompt_counter_events is reachable by API roles, or the counter
+--      helpers are callable by them.
 
 \set ON_ERROR_STOP on
 
@@ -240,5 +243,109 @@ begin
   if reports_select_count > 0 then
     raise exception 'public.prompt_reports must not have any SELECT or ALL policy (got %)', reports_select_count;
   end if;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 6. public.prompt_uploads: SELECT policy must be owner-only, NO write policies
+-- ---------------------------------------------------------------------------
+--
+-- Prompt upload logs track daily limits for unverified users. Users can inspect
+-- their own upload history, but writes are exclusively managed by the database
+-- trigger (SECURITY DEFINER) on prompt creation.
+
+do $$
+declare
+  pol record;
+  write_pol_count int;
+begin
+  if not exists (
+    select 1 from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relname = 'prompt_uploads' and c.relrowsecurity
+  ) then
+    raise exception 'RLS must be enabled on public.prompt_uploads';
+  end if;
+
+  select * into pol
+  from pg_policies
+  where schemaname = 'public'
+    and tablename = 'prompt_uploads'
+    and cmd = 'SELECT';
+
+  if pol is null then
+    raise exception 'public.prompt_uploads must have a SELECT policy';
+  end if;
+
+  if pol.roles <> '{authenticated}' then
+    raise exception 'public.prompt_uploads SELECT policy must be restricted to authenticated (got: %)', pol.roles;
+  end if;
+
+  if replace(pol.qual, ' ', '') <> '(auth.uid()=user_id)' then
+    raise exception 'public.prompt_uploads SELECT policy must use (auth.uid() = user_id), got: %', pol.qual;
+  end if;
+
+  if exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'prompt_uploads'
+      and cmd in ('SELECT', 'ALL')
+      and ('anon' = any(roles) or 'public' = any(roles))
+  ) then
+    raise exception 'public.prompt_uploads must not have any SELECT policy accessible by anon or public';
+  end if;
+
+  select count(*) into write_pol_count
+  from pg_policies
+  where schemaname = 'public'
+    and tablename = 'prompt_uploads'
+    and cmd in ('INSERT', 'UPDATE', 'DELETE', 'ALL');
+
+  if write_pol_count > 0 then
+    raise exception 'public.prompt_uploads must not have any write policies (got %)', write_pol_count;
+  end if;
+end;
+$$;
+
+
+-- ---------------------------------------------------------------------------
+-- 7. public.prompt_counter_events: invisible to the API, helpers internal
+-- ---------------------------------------------------------------------------
+--
+-- Only the security definer counter functions use this table. If clients could
+-- read it they would see who viewed what, and if they could write it they could
+-- reset the throttle. The helpers are internal, only the two counters are API.
+
+do $$
+declare
+  r text;
+begin
+  if not exists (
+    select 1 from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relname = 'prompt_counter_events' and c.relrowsecurity
+  ) then
+    raise exception 'RLS must be enabled on public.prompt_counter_events';
+  end if;
+
+  if exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'prompt_counter_events') then
+    raise exception 'public.prompt_counter_events must have no policies';
+  end if;
+
+  foreach r in array array['anon', 'authenticated'] loop
+    if has_table_privilege(r, 'public.prompt_counter_events', 'SELECT, INSERT, UPDATE, DELETE') then
+      raise exception 'public.prompt_counter_events must have no privileges for %', r;
+    end if;
+
+    if has_function_privilege(r, 'public.claim_prompt_counter(uuid, text, text, interval)', 'EXECUTE')
+       or has_function_privilege(r, 'public.prompt_counter_actor()', 'EXECUTE') then
+      raise exception 'counter helper functions must not be executable by %', r;
+    end if;
+
+    if not has_function_privilege(r, 'public.increment_view_count(uuid)', 'EXECUTE')
+       or not has_function_privilege(r, 'public.increment_copy_count(uuid)', 'EXECUTE') then
+      raise exception 'increment_view_count and increment_copy_count must stay executable by %', r;
+    end if;
+  end loop;
 end;
 $$;

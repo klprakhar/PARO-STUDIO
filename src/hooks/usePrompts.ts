@@ -1,6 +1,13 @@
 
+import { useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { getAllPrompts, getRecentPromptCreatorIds } from "@/services/supabase/prompts";
+import { getProfilesByIds } from "@/services/supabase/profiles";
+import { getLikeCounts, getLikedPromptIds } from "@/services/supabase/likes";
+import { getSavedPromptIds } from "@/services/supabase/saves";
+import { getPromptRatings } from "@/services/supabase/ratings";
+import { getFollowerCounts } from "@/services/supabase/follows";
 
 export interface PromptWithDetails {
   id: string;
@@ -32,65 +39,67 @@ export function usePrompts(options?: {
   sortBy?: "trending" | "newest" | "most_copied";
   limit?: number;
 }) {
-  const { user, loading } = useAuth();
+  const { user, sessionLoading } = useAuth();
   const { selectedTags = [], searchQuery = "", sortBy = "trending", limit = 50 } = options || {};
 
-  return useQuery({
-    // Stable key - only includes search params, not auth state
-    queryKey: ["prompts", selectedTags, searchQuery, sortBy, limit],
-    queryFn: async () => {
-      // Get all prompts from Supabase
-      const { getAllPrompts } = await import('@/services/supabase/prompts');
-      const { prompts: allPrompts, error } = await getAllPrompts(limit * 2); // Get more for filtering
-      
-      if (error) {
-        console.error('Error fetching prompts:', error);
-        return [];
-      }
-
-      // Filter by Search Query
+  // Search, tags and sort all work on the same fetched rows, so they are
+  // applied in `select` rather than being part of the key. Putting them in the
+  // key refetched the whole feed and flashed skeletons on every sort or tag
+  // click, for data that was already in the cache.
+  const tagsKey = JSON.stringify(selectedTags);
+  const selectFeed = useCallback(
+    (allPrompts: PromptWithDetails[]) => {
       let filtered = allPrompts;
+
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         filtered = filtered.filter(p =>
           p.title.toLowerCase().includes(query) ||
           p.promptText.toLowerCase().includes(query) ||
-          (p.tags && p.tags.some(t => t.toLowerCase().includes(query)))
+          p.tags.some(t => t.toLowerCase().includes(query))
         );
       }
 
-      // Filter by Tags
       if (selectedTags.length > 0) {
         filtered = filtered.filter(p =>
-          p.tags && selectedTags.some(tag => p.tags!.includes(tag))
+          selectedTags.some(tag => p.tags.includes(tag))
         );
       }
 
-      // Sort
-      filtered.sort((a, b) => {
-        if (sortBy === "newest") {
-          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-        } else if (sortBy === "most_copied") {
-          return (b.copyCount || 0) - (a.copyCount || 0);
-        } else {
-          // Trending: View count for now
-          return (b.viewCount || 0) - (a.viewCount || 0);
-        }
-      });
+      // Copy before sorting so the cached list is never reordered in place.
+      return [...filtered]
+        .sort((a, b) => {
+          if (sortBy === "newest") {
+            return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+          } else if (sortBy === "most_copied") {
+            return (b.copyCount || 0) - (a.copyCount || 0);
+          } else {
+            // Trending: View count for now
+            return (b.viewCount || 0) - (a.viewCount || 0);
+          }
+        })
+        .slice(0, limit);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [searchQuery, tagsKey, sortBy, limit]
+  );
 
-      // Limit
-      filtered = filtered.slice(0, limit);
+  return useQuery({
+    // The user id is in the key because isLiked and isSaved depend on it.
+    queryKey: ["prompts", limit, user?.id ?? null],
+    queryFn: async () => {
+      const { prompts: allPrompts, error } = await getAllPrompts(limit * 2); // Get more for filtering
 
-      // Enrich in bulk. Doing this per prompt meant 4 extra round trips each —
+      if (error) {
+        console.error('Error fetching prompts:', error);
+        return [];
+      }
+
+      // Enrich in bulk. Doing this per prompt meant 4 extra round trips each,
       // 200+ requests for a 50-prompt feed. These five run once, in parallel,
       // regardless of how many prompts came back.
-      const { getProfilesByIds } = await import('@/services/supabase/profiles');
-      const { getLikeCounts, getLikedPromptIds } = await import('@/services/supabase/likes');
-      const { getSavedPromptIds } = await import('@/services/supabase/saves');
-      const { getPromptRatings } = await import('@/services/supabase/ratings');
-
-      const promptIds = filtered.map(p => p.id);
-      const creatorIds = filtered.map(p => p.userId);
+      const promptIds = allPrompts.map(p => p.id);
+      const creatorIds = allPrompts.map(p => p.userId);
 
       const [profiles, likeCounts, likedIds, savedIds, ratingsMap] = await Promise.all([
         getProfilesByIds(creatorIds),
@@ -100,7 +109,7 @@ export function usePrompts(options?: {
         getPromptRatings(promptIds),
       ]);
 
-      const enrichedPrompts: PromptWithDetails[] = filtered.map((p) => {
+      const enrichedPrompts: PromptWithDetails[] = allPrompts.map((p) => {
         const profile = profiles.get(p.userId) ?? null;
         const ratingInfo = ratingsMap.get(p.id);
 
@@ -137,8 +146,11 @@ export function usePrompts(options?: {
 
       return enrichedPrompts;
     },
-    // Wait for auth to stabilize before running query
-    enabled: !loading,
+    select: selectFeed,
+    // Waits only for the stored session, which is read locally. Waiting on the
+    // profile fetch as well held the whole feed back behind two extra round
+    // trips it does not need.
+    enabled: !sessionLoading,
   });
 }
 
@@ -147,16 +159,15 @@ export function useTags() {
     queryKey: ["tags"],
     queryFn: async () => {
       // Get all prompts and extract unique tags
-      const { getAllPrompts } = await import('@/services/supabase/prompts');
       const { prompts, error } = await getAllPrompts(100);
-      
+
       if (error || !prompts) return [];
-      
+
       const tagsSet = new Set<string>();
       prompts.forEach(p => {
         p.tags?.forEach(tag => tagsSet.add(tag));
       });
-      
+
       return Array.from(tagsSet).sort();
     },
   });
@@ -166,17 +177,16 @@ export function useTopCreators(limit = 6) {
   return useQuery({
     queryKey: ["top-creators", limit],
     queryFn: async () => {
-      const { getAllPrompts } = await import('@/services/supabase/prompts');
-      const { getProfilesByIds } = await import('@/services/supabase/profiles');
-      const { getFollowerCounts } = await import('@/services/supabase/follows');
-      const { prompts, error } = await getAllPrompts(200); // Get more prompts to find top creators
+      // Only the owner of each prompt is needed here. Fetching whole rows
+      // downloaded the full text of 200 prompts just to count them.
+      const { userIds, error } = await getRecentPromptCreatorIds(200);
 
-      if (error || !prompts) {
+      if (error) {
         console.error('Error fetching prompts for top creators:', error);
         return [];
       }
 
-      const creatorIds = Array.from(new Set(prompts.map(p => p.userId)));
+      const creatorIds = Array.from(new Set(userIds));
 
       // Two queries total, rather than two per creator.
       const [profiles, followerCounts] = await Promise.all([
@@ -185,8 +195,8 @@ export function useTopCreators(limit = 6) {
       ]);
 
       const promptCounts = new Map<string, number>();
-      for (const p of prompts) {
-        promptCounts.set(p.userId, (promptCounts.get(p.userId) ?? 0) + 1);
+      for (const userId of userIds) {
+        promptCounts.set(userId, (promptCounts.get(userId) ?? 0) + 1);
       }
 
       return creatorIds
@@ -210,4 +220,3 @@ export function useTopCreators(limit = 6) {
     },
   });
 }
-

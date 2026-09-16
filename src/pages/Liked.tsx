@@ -6,6 +6,9 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { PromptCard } from "@/components/prompts/PromptCard";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getUserLikes } from "@/services/supabase/likes";
+import { getProfilesByIds } from "@/services/supabase/profiles";
+import { getSavedPromptIds } from "@/services/supabase/saves";
 
 export default function Liked() {
   const { user, session, profile, loading } = useAuth();
@@ -17,10 +20,6 @@ export default function Liked() {
       if (!user?.id) return [];
 
       // Get liked prompts from Supabase
-      const { getUserLikes } = await import('@/services/supabase/likes');
-      const { getProfile } = await import('@/services/supabase/profiles');
-      const { isSaved } = await import('@/services/supabase/saves');
-
       const { prompts, error } = await getUserLikes(user.id);
       
       if (error) {
@@ -29,9 +28,15 @@ export default function Liked() {
       }
 
       // Enrich with creator and save status
-      const enriched = await Promise.all(prompts.map(async (p) => {
-        const creator = await getProfile(p.userId);
-        const saved = await isSaved(user.id, p.id);
+      // Two queries for the whole page, rather than two per prompt.
+      const [creators, savedIds] = await Promise.all([
+        getProfilesByIds(prompts.map((p) => p.userId)),
+        getSavedPromptIds(user.id, prompts.map((p) => p.id)),
+      ]);
+
+      const enriched = prompts.map((p) => {
+        const creator = creators.get(p.userId) ?? null;
+        const saved = savedIds.has(p.id);
 
         return {
           id: p.id,
@@ -60,7 +65,7 @@ export default function Liked() {
           isLiked: true, // Always true on this page
           isSaved: saved
         };
-      }));
+      });
 
       return enriched;
     },

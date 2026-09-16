@@ -20,9 +20,9 @@ const MAX_BANNER_SIZE = 5 * 1024 * 1024; // 5MB
 
 // Checked before decoding. Decoding something enormous can lock up the tab, so
 // this rejects the pathological case before we touch it. Deliberately generous.
-const MAX_SOURCE_SIZE = 25 * 1024 * 1024; // 25MB
+export const MAX_SOURCE_SIZE = 25 * 1024 * 1024; // 25MB
 
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+export const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 // Storage path extensions, keyed by MIME type so the path never contains
 // anything taken from a user supplied filename.
