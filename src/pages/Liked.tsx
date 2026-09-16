@@ -113,7 +113,7 @@ export default function Liked() {
             <div className="masonry-grid">
               {[...Array(6)].map((_, i) => (
                 <div key={i} className="masonry-item">
-                  <Skeleton className="aspect-[3/4] rounded-sm" />
+                  <Skeleton className="aspect-[3/4] rounded-xl" />
                 </div>
               ))}
             </div>

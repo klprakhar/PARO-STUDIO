@@ -344,7 +344,7 @@ export default function PromptDetail() {
         <Navbar />
         <main className="pt-14 sm:pt-16 lg:pt-20 px-4 sm:px-6 lg:px-8">
           <div className="max-w-[1400px] mx-auto flex flex-col lg:flex-row gap-4 sm:gap-6 items-start py-4">
-            <Skeleton className="w-full lg:w-2/5 aspect-square rounded-sm" />
+            <Skeleton className="w-full lg:w-2/5 aspect-square rounded-xl" />
             <div className="w-full lg:w-3/5 space-y-3 sm:space-y-4">
               <Skeleton className="h-6 sm:h-8 w-3/4" />
               <Skeleton className="h-4 w-1/2" />
@@ -406,7 +406,7 @@ export default function PromptDetail() {
                 <img
                   src={prompt.imageUrl}
                   alt={prompt.title}
-                  className="max-h-[40vh] sm:max-h-[35vh] lg:max-h-[50vh] w-auto max-w-full object-contain rounded-sm shadow-card"
+                  className="max-h-[40vh] sm:max-h-[35vh] lg:max-h-[50vh] w-auto max-w-full object-contain rounded-xl shadow-card"
                   loading="lazy"
                 />
               </div>
@@ -479,8 +479,8 @@ export default function PromptDetail() {
                     onClick={handleCopy}
                     size="default"
                     className={cn(
-                      "gap-1.5 sm:gap-2 text-sm",
-                      copied && "bg-gold text-gold-foreground"
+                      "gap-1.5 sm:gap-2 text-sm transition-colors",
+                      copied && "bg-success hover:bg-success text-success-foreground hover:text-success-foreground"
                     )}
                   >
                     {copied ? (
@@ -536,7 +536,7 @@ export default function PromptDetail() {
                 </div>
 
                 {/* Accuracy Rating Interactive Widget */}
-                <div className="rounded-lg border border-border/80 bg-secondary/30 p-3 sm:p-3.5 space-y-2.5">
+                <div className="rounded-xl border border-border/80 bg-secondary/30 p-3 sm:p-3.5 space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <div className="p-1.5 rounded-full bg-gold/10 text-gold border border-gold/20 flex-shrink-0">

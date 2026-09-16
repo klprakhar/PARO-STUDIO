@@ -186,7 +186,7 @@ export default function Index() {
         <section className="md:hidden px-4 py-4 sm:py-6">
           <Link
             to="/originals"
-            className="flex items-center justify-between p-3 sm:p-4 rounded-lg bg-gradient-to-r from-[hsl(var(--gold))]/10 to-transparent border border-[hsl(var(--gold))]/20 hover:border-[hsl(var(--gold))]/40 transition-all"
+            className="flex items-center justify-between p-3 sm:p-4 rounded-xl bg-gradient-to-r from-[hsl(var(--gold))]/10 to-transparent border border-[hsl(var(--gold))]/20 hover:border-[hsl(var(--gold))]/40 transition-all"
           >
             <div className="flex items-center gap-2 sm:gap-3">
               <Sparkles className="h-4 sm:h-5 w-4 sm:w-5 text-[hsl(var(--gold))]" />
@@ -240,7 +240,7 @@ export default function Index() {
               <div className="masonry-grid">
                 {[...Array(8)].map((_, i) => (
                   <div key={i} className="masonry-item">
-                    <Skeleton className="aspect-[3/4] rounded-sm" />
+                    <Skeleton className="aspect-[3/4] rounded-xl" />
                     <Skeleton className="h-5 sm:h-6 mt-2 sm:mt-3 w-3/4" />
                     <Skeleton className="h-3 sm:h-4 mt-1.5 sm:mt-2 w-1/2" />
                   </div>
