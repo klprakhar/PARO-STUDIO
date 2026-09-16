@@ -195,7 +195,7 @@ export function EditPromptModal({
               <img
                 src={imagePreview}
                 alt="Preview"
-                className="w-full max-h-64 object-contain rounded-sm bg-secondary"
+                className="w-full max-h-64 object-contain rounded-xl bg-secondary"
               />
               <label className="absolute bottom-3 right-3 p-2 rounded-full bg-background/90 backdrop-blur-sm cursor-pointer hover:bg-background transition-colors">
                 <Upload className="h-4 w-4" />

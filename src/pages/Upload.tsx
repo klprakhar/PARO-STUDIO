@@ -418,7 +418,7 @@ export default function UploadPrompt() {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full h-36 sm:h-48 border-2 border-dashed border-border rounded-sm flex flex-col items-center justify-center gap-2 sm:gap-3 hover:border-accent transition-colors bg-secondary/30 touch-target"
+                    className="w-full h-36 sm:h-48 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-2 sm:gap-3 hover:border-accent transition-colors bg-secondary/30 touch-target"
                   >
                     <ImageIcon className="h-8 sm:h-10 w-8 sm:w-10 text-muted-foreground" />
                     <div className="text-center px-4">
@@ -426,87 +426,13 @@ export default function UploadPrompt() {
                       <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WEBP up to 3MB</p>
                     </div>
                   </button>
-                </div>
-
-                {useUrl ? (
-                  <div className="space-y-2">
-                    <Input
-                      type="url"
-                      placeholder="https://example.com/image.jpg"
-                      value={imageUrl}
-                      onChange={(e) => {
-                        setImageUrl(e.target.value);
-                        setImagePreview(e.target.value);
-                      }}
-                      className="bg-secondary/50 border-0 text-sm sm:text-base"
-                    />
-                    {imagePreview && (
-                      <div className="relative">
-                        <img
-                          src={imagePreview}
-                          alt="Preview"
-                          className="w-full max-h-48 sm:max-h-64 object-contain bg-secondary rounded-xl"
-                          onError={() => {
-                            toast({
-                              title: "Invalid image URL",
-                              description: "Could not load image from the provided URL",
-                              variant: "destructive",
-                            });
-                            setImagePreview(null);
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setImageUrl("");
-                            setImagePreview(null);
-                          }}
-                          className="absolute top-2 right-2 p-1.5 bg-background/80 rounded-sm hover:bg-background transition-colors touch-target"
-                          aria-label="Clear image"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
                 ) : (
                   <div className="relative">
                     <img
                       src={imagePreview}
                       alt="Preview"
-                      className="w-full max-h-48 sm:max-h-64 object-contain bg-secondary rounded-sm"
+                      className="w-full max-h-48 sm:max-h-64 object-contain bg-secondary rounded-xl"
                     />
-
-                    {!imagePreview ? (
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full h-36 sm:h-48 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-2 sm:gap-3 hover:border-accent transition-colors bg-secondary/30 touch-target"
-                      >
-                        <ImageIcon className="h-8 sm:h-10 w-8 sm:w-10 text-muted-foreground" />
-                        <div className="text-center px-4">
-                          <p className="text-xs sm:text-sm font-medium">Click to upload image</p>
-                          <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WEBP up to 5MB</p>
-                        </div>
-                      </button>
-                    ) : (
-                      <div className="relative">
-                        <img
-                          src={imagePreview}
-                          alt="Preview"
-                          className="w-full max-h-48 sm:max-h-64 object-contain bg-secondary rounded-xl"
-                        />
-                        <button
-                          type="button"
-                          onClick={clearImage}
-                          className="absolute top-2 right-2 p-1.5 bg-background/80 rounded-sm hover:bg-background transition-colors touch-target"
-                          aria-label="Remove image"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    )}
-                  </>
                     <button
                       type="button"
                       onClick={clearImage}
