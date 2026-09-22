@@ -388,6 +388,7 @@ export default function Settings() {
                 <Input
                   id="username"
                   placeholder="username"
+                  maxLength={30}
                   value={username}
                   onChange={(e) => {
                     setUsername(e.target.value.toLowerCase());
@@ -408,6 +409,7 @@ export default function Settings() {
                 <Input
                   id="displayName"
                   placeholder="Your Name"
+                  maxLength={50}
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   className="bg-secondary/50 border-0"

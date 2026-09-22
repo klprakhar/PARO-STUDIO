@@ -195,6 +195,7 @@ export default function CompleteProfile() {
                 <Input
                   id="username"
                   placeholder="your_username"
+                  maxLength={30}
                   value={username}
                   onChange={(e) => {
                     const value = e.target.value.toLowerCase();
@@ -215,7 +216,7 @@ export default function CompleteProfile() {
                   <p className="text-sm text-destructive">{usernameError}</p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Lowercase letters, numbers, and underscores only. Min 3 characters.
+                  Lowercase letters, numbers, and underscores only. 3 to 30 characters.
                 </p>
               </div>
 

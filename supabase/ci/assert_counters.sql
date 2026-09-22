@@ -20,7 +20,7 @@ declare
   copies    integer;
 begin
   insert into auth.users (id) values (owner_id);
-  insert into public.profiles (id, username, verified) values (owner_id, 'counter-test', true);
+  insert into public.profiles (id, username, verified) values (owner_id, 'counter_test', true);
 
   insert into public.prompts (user_id, title, prompt, image_url, ai_tool)
   values (owner_id, 'A', 'prompt a', 'https://example.test/a.png', 'Midjourney')
