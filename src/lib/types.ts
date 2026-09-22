@@ -19,7 +19,8 @@ export interface NormalizedPrompt {
   id: string;
   userId: string;
   title: string;
-  promptText: string;
+  /** Only loaded for signed in viewers. The database refuses it to anyone else. */
+  promptText?: string;
   imageUrl: string;
   toolUsed: string;
   tags: string[];

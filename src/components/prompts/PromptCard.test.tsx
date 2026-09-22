@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -91,5 +91,20 @@ describe("PromptCard", () => {
     const viewsElement = screen.getByTitle("Views");
     expect(viewsElement).toBeInTheDocument();
     expect(viewsElement).toHaveTextContent("150");
+  });
+
+  // useAuth is mocked signed out above. Every gated action should open the sign
+  // in dialog through onLoginRequired, not just show a toast.
+  it.each([
+    ["Copy prompt"],
+    ["Like"],
+    ["Save"],
+  ])("asks a signed out user to sign in when they tap %s", (label) => {
+    const onLoginRequired = vi.fn();
+    renderPromptCard({ ...baseProps, onLoginRequired });
+
+    fireEvent.click(screen.getAllByLabelText(label)[0]);
+
+    expect(onLoginRequired).toHaveBeenCalledTimes(1);
   });
 });

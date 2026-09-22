@@ -8,7 +8,8 @@ export interface ImageFeedItem {
   data: {
     id: string;
     title: string;
-    prompt_text: string;
+    /** Only present for signed in viewers. */
+    prompt_text?: string;
     image_url: string;
     tool_used: string;
     view_count: number;
@@ -83,7 +84,7 @@ export function injectAdvertisements(
 export function toImageFeedItem(prompt: {
   id: string;
   title: string;
-  promptText: string;  // camelCase from usePrompts
+  promptText?: string;  // camelCase from usePrompts, signed in only
   imageUrl: string;    // camelCase from usePrompts
   toolUsed: string;    // camelCase from usePrompts
   viewCount: number;

@@ -151,15 +151,54 @@ export async function createPrompt(data: CreatePromptData) {
 }
 
 /**
- * Get prompt by ID
- * Should be accessible publicly (read access for all)
+ * The prompt text is only for signed in users. Signed out visitors can see the
+ * image, title, tags and counts, and get the prompt by signing in and copying.
+ *
+ * The database enforces this: the anon role cannot read `prompts.prompt` at
+ * all, so a signed out `select('*')` on prompts fails outright. Every query a
+ * signed out visitor can reach must list its columns and leave `prompt` out.
+ * Signed in queries add it back, which keeps Copy instant: the clipboard write
+ * has to happen during the tap, and Safari blocks it after a network wait.
  */
-export async function getPrompt(id: string) {
-  const { data, error } = await supabase
-    .from('prompts')
-    .select('*')
-    .eq('id', id)
-    .single();
+const PUBLIC_PROMPT_COLUMNS =
+  'id, user_id, title, image_url, ai_tool, tags, created_at, updated_at, view_count, copy_count' as const;
+const PROMPT_COLUMNS_WITH_TEXT = `${PUBLIC_PROMPT_COLUMNS}, prompt` as const;
+
+type PromptListRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  image_url: string;
+  ai_tool: string;
+  tags: string[] | null;
+  created_at: string;
+  view_count: number;
+  copy_count: number;
+  prompt?: string;
+};
+
+function normalizePromptRow(p: PromptListRow): NormalizedPrompt {
+  return {
+    id: p.id,
+    userId: p.user_id,
+    title: p.title,
+    promptText: p.prompt,
+    imageUrl: p.image_url,
+    toolUsed: p.ai_tool,
+    tags: p.tags || [],
+    createdAt: p.created_at,
+    viewCount: p.view_count || 0,
+    copyCount: p.copy_count || 0,
+  };
+}
+
+/**
+ * Get prompt by ID. Pass `includeText` only when the viewer is signed in.
+ */
+export async function getPrompt(id: string, includeText = false) {
+  const { data, error } = includeText
+    ? await supabase.from('prompts').select(PROMPT_COLUMNS_WITH_TEXT).eq('id', id).single()
+    : await supabase.from('prompts').select(PUBLIC_PROMPT_COLUMNS).eq('id', id).single();
 
   if (error) {
     console.error('❌ getPrompt: Fetch failed:', {
@@ -175,49 +214,41 @@ export async function getPrompt(id: string) {
   return { prompt: data, error: null };
 }
 
+/**
+ * A user's prompts, newest first. Pass `includeText` only when the viewer is
+ * signed in.
+ */
 export async function getUserPrompts(
-  userId: string
+  userId: string,
+  includeText = false
 ): Promise<{ prompts: NormalizedPrompt[]; error: PostgrestError | null }> {
-  const { data, error } = await supabase
-    .from('prompts')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+  const { data, error } = includeText
+    ? await supabase.from('prompts').select(PROMPT_COLUMNS_WITH_TEXT)
+        .eq('user_id', userId).order('created_at', { ascending: false })
+    : await supabase.from('prompts').select(PUBLIC_PROMPT_COLUMNS)
+        .eq('user_id', userId).order('created_at', { ascending: false });
 
   if (error) {
     console.error('❌ getUserPrompts: Fetch failed:', error);
     return { prompts: [], error };
   }
 
-  // Normalize to camelCase (match PromptWithDetails shape)
-  const normalizedPrompts: NormalizedPrompt[] = (data || []).map(p => ({
-    id: p.id,
-    userId: p.user_id,
-    title: p.title,
-    promptText: p.prompt,
-    imageUrl: p.image_url,
-    toolUsed: p.ai_tool,
-    tags: p.tags || [],
-    createdAt: p.created_at,
-    viewCount: p.view_count || 0,
-    copyCount: p.copy_count || 0,
-  }));
-
-  return { prompts: normalizedPrompts, error: null };
+  return { prompts: (data || []).map(normalizePromptRow), error: null };
 }
 
 /**
- * Get all prompts (for main feed)
- * Should be accessible publicly (read access for all)
+ * The newest prompts, for the feed. Pass `includeText` only when the viewer is
+ * signed in.
  */
 export async function getAllPrompts(
-  limit = 50
+  limit = 50,
+  includeText = false
 ): Promise<{ prompts: NormalizedPrompt[]; error: PostgrestError | null }> {
-  const { data, error } = await supabase
-    .from('prompts')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(limit);
+  const { data, error } = includeText
+    ? await supabase.from('prompts').select(PROMPT_COLUMNS_WITH_TEXT)
+        .order('created_at', { ascending: false }).limit(limit)
+    : await supabase.from('prompts').select(PUBLIC_PROMPT_COLUMNS)
+        .order('created_at', { ascending: false }).limit(limit);
 
   if (error) {
     console.error('❌ getAllPrompts: Fetch failed:', {
@@ -228,21 +259,26 @@ export async function getAllPrompts(
     return { prompts: [], error };
   }
 
-  // Normalize to camelCase (match PromptWithDetails shape)
-  const normalizedPrompts: NormalizedPrompt[] = (data || []).map(p => ({
-    id: p.id,
-    userId: p.user_id,
-    title: p.title,
-    promptText: p.prompt,
-    imageUrl: p.image_url,
-    toolUsed: p.ai_tool,
-    tags: p.tags || [],
-    createdAt: p.created_at,
-    viewCount: p.view_count || 0,
-    copyCount: p.copy_count || 0,
-  }));
+  return { prompts: (data || []).map(normalizePromptRow), error: null };
+}
 
-  return { prompts: normalizedPrompts, error: null };
+/**
+ * One prompt's text, for Copy when it was not already loaded. Only works signed
+ * in; for anyone else the database refuses the column.
+ */
+export async function getPromptText(id: string): Promise<{ text: string | null; error: PostgrestError | null }> {
+  const { data, error } = await supabase
+    .from('prompts')
+    .select('prompt')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) {
+    console.error('❌ getPromptText: Fetch failed:', error);
+    return { text: null, error };
+  }
+
+  return { text: data?.prompt ?? null, error: null };
 }
 
 /**

@@ -25,9 +25,14 @@ import { supabase } from '@/services/supabase';
 // Example: Query data
 const { data, error } = await supabase
   .from('prompts')
-  .select('*')
+  .select('id, title, image_url')
   .limit(10);
 ```
+
+Do not `select('*')` on `prompts` in anything a signed out visitor can reach.
+The prompt text is sign in only, the database refuses `prompts.prompt` to
+signed out users, so a `*` query fails outright for them. Use the helpers in
+`prompts.ts`, which list their columns and only add `prompt` when signed in.
 
 ## File Structure
 

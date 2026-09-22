@@ -11,6 +11,8 @@
 --   6. public.prompt_uploads select policy is not owner-only, or has write policies.
 --   7. public.prompt_counter_events is reachable by API roles, or the counter
 --      helpers are callable by them.
+--   8. Signed out visitors (anon) can read prompts.prompt, or lost the other
+--      prompt columns the feed needs, or signed in users lost the text.
 
 \set ON_ERROR_STOP on
 
@@ -349,3 +351,58 @@ begin
   end loop;
 end;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- 8. The prompt text is sign in only
+-- ---------------------------------------------------------------------------
+--
+-- 20260922130000_hide_prompt_text_from_signed_out.sql. anon can browse prompts
+-- but not read their text; authenticated keeps everything. The second block
+-- checks the behaviour as anon, including that select * fails, which is why
+-- the app must list its columns for signed out queries.
+
+do $$
+declare
+  c text;
+begin
+  if has_column_privilege('anon', 'public.prompts', 'prompt', 'SELECT') then
+    raise exception 'prompts.prompt must not be readable by anon';
+  end if;
+
+  foreach c in array array['id', 'user_id', 'title', 'image_url', 'ai_tool', 'tags',
+                           'view_count', 'copy_count', 'created_at', 'updated_at'] loop
+    if not has_column_privilege('anon', 'public.prompts', c, 'SELECT') then
+      raise exception 'prompts.% must stay readable by anon, the signed out feed needs it', c;
+    end if;
+  end loop;
+
+  if not has_column_privilege('authenticated', 'public.prompts', 'prompt', 'SELECT') then
+    raise exception 'prompts.prompt must stay readable by authenticated';
+  end if;
+end;
+$$;
+
+begin;
+set local role anon;
+
+do $$
+begin
+  perform id, title, image_url from public.prompts limit 1;
+
+  begin
+    perform prompt from public.prompts limit 1;
+    raise exception 'anon was able to read prompts.prompt';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    perform * from public.prompts limit 1;
+    raise exception 'anon select * on prompts should fail now that prompt is hidden';
+  exception
+    when insufficient_privilege then null;
+  end;
+end;
+$$;
+
+rollback;

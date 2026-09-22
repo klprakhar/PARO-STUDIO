@@ -1,4 +1,5 @@
 import { useSocialMutation } from "@/hooks/useSocialMutation";
+import { copyPromptText } from "@/lib/copyPromptText";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Eye, Copy, Heart, Bookmark, Check, Pencil, Trash2, Share2, MoreHorizontal, Link as LinkIcon, UserCircle, Flag, MoreVertical, Star } from "lucide-react";
@@ -30,7 +31,8 @@ import {
 interface PromptCardProps {
   id: string;
   title: string;
-  promptText: string;
+  /** Only loaded for signed in viewers. Copy fetches it if it is missing. */
+  promptText?: string;
   imageUrl: string;
   toolUsed: string;
   viewCount?: number | null;
@@ -109,16 +111,35 @@ export function PromptCard({
   // Only the creator can delete; everyone else gets Report in that slot.
   const isOwner = !!user && !!profile && profile.id === creator.id;
 
+  // Every action that needs an account opens the sign in dialog when the page
+  // provides one. The toast is only a fallback for a card rendered without it.
+  const askToSignIn = (action: string) => {
+    if (onLoginRequired) {
+      onLoginRequired();
+      return;
+    }
+    toast({ title: "Sign in required", description: `Please sign in to ${action}` });
+  };
+
   const handleCopy = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
     if (!user) {
-      onLoginRequired?.();
+      askToSignIn("copy prompts");
       return;
     }
 
-    await navigator.clipboard.writeText(promptText);
+    // Static import on purpose. Anything awaited before the clipboard write
+    // can make Safari treat it as outside the tap and refuse it.
+    if (!(await copyPromptText(id, promptText))) {
+      toast({
+        title: "Couldn't copy the prompt",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
     setCopied(true);
 
     // Increment copy count in Supabase
@@ -133,10 +154,7 @@ export function PromptCard({
     e.stopPropagation();
 
     if (!user) {
-      toast({
-        title: "Sign in required",
-        description: "Please sign in to like prompts",
-      });
+      askToSignIn("like prompts");
       return;
     }
 
@@ -148,10 +166,7 @@ export function PromptCard({
     e.stopPropagation();
 
     if (!user) {
-      toast({
-        title: "Sign in required",
-        description: "Please sign in to save prompts",
-      });
+      askToSignIn("save prompts");
       return;
     }
 

@@ -6,6 +6,7 @@ import {
   checkDailyUploadLimit,
   deletePrompt,
   getAllPrompts,
+  getPrompt,
   getUserPrompts,
   updatePrompt,
 } from "./prompts";
@@ -55,7 +56,7 @@ describe("prompts service", () => {
   });
 
   describe("getAllPrompts", () => {
-    it("returns normalized prompts with camelCase properties", async () => {
+    it("returns normalized prompts with camelCase properties when signed in", async () => {
       const limitMock = vi.fn().mockResolvedValue({
         data: mockDbPrompts,
         error: null,
@@ -67,10 +68,10 @@ describe("prompts service", () => {
         select: selectMock,
       } as never);
 
-      const { prompts, error } = await getAllPrompts(25);
+      const { prompts, error } = await getAllPrompts(25, true);
 
       expect(supabase.from).toHaveBeenCalledWith("prompts");
-      expect(selectMock).toHaveBeenCalledWith("*");
+      expect(selectMock.mock.calls[0][0]).toMatch(/\bprompt\b/);
       expect(orderMock).toHaveBeenCalledWith("created_at", { ascending: false });
       expect(limitMock).toHaveBeenCalledWith(25);
       expect(error).toBeNull();
@@ -147,7 +148,7 @@ describe("prompts service", () => {
   });
 
   describe("getUserPrompts", () => {
-    it("returns normalized prompts for given userId", async () => {
+    it("returns normalized prompts for given userId when signed in", async () => {
       const orderMock = vi.fn().mockResolvedValue({
         data: [mockDbPrompts[0]],
         error: null,
@@ -159,10 +160,10 @@ describe("prompts service", () => {
         select: selectMock,
       } as never);
 
-      const { prompts, error } = await getUserPrompts("user-1");
+      const { prompts, error } = await getUserPrompts("user-1", true);
 
       expect(supabase.from).toHaveBeenCalledWith("prompts");
-      expect(selectMock).toHaveBeenCalledWith("*");
+      expect(selectMock.mock.calls[0][0]).toMatch(/\bprompt\b/);
       expect(eqMock).toHaveBeenCalledWith("user_id", "user-1");
       expect(orderMock).toHaveBeenCalledWith("created_at", { ascending: false });
       expect(error).toBeNull();
@@ -180,6 +181,62 @@ describe("prompts service", () => {
           copyCount: 5,
         },
       ]);
+    });
+  });
+
+  // The database refuses prompts.prompt to signed out visitors, and a signed out
+  // select("*") on prompts fails outright. These pin both rules: never "*", and
+  // no prompt column unless the caller says the viewer is signed in.
+  describe("signed out queries never ask for the prompt text", () => {
+    const hasPromptColumn = (columns: string) =>
+      columns.split(",").map((c) => c.trim()).includes("prompt");
+
+    it("getAllPrompts", async () => {
+      const limitMock = vi.fn().mockResolvedValue({ data: [], error: null });
+      const selectMock = vi.fn().mockReturnValue({ order: vi.fn().mockReturnValue({ limit: limitMock }) });
+      vi.mocked(supabase.from).mockReturnValue({ select: selectMock } as never);
+
+      await getAllPrompts(10);
+
+      const columns = selectMock.mock.calls[0][0] as string;
+      expect(columns).not.toBe("*");
+      expect(hasPromptColumn(columns)).toBe(false);
+      expect(columns).toContain("image_url");
+    });
+
+    it("getUserPrompts", async () => {
+      const orderMock = vi.fn().mockResolvedValue({ data: [], error: null });
+      const selectMock = vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ order: orderMock }) });
+      vi.mocked(supabase.from).mockReturnValue({ select: selectMock } as never);
+
+      await getUserPrompts("user-1");
+
+      const columns = selectMock.mock.calls[0][0] as string;
+      expect(columns).not.toBe("*");
+      expect(hasPromptColumn(columns)).toBe(false);
+    });
+
+    it("getPrompt", async () => {
+      const singleMock = vi.fn().mockResolvedValue({ data: null, error: null });
+      const selectMock = vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ single: singleMock }) });
+      vi.mocked(supabase.from).mockReturnValue({ select: selectMock } as never);
+
+      await getPrompt("prompt-1");
+
+      const columns = selectMock.mock.calls[0][0] as string;
+      expect(columns).not.toBe("*");
+      expect(hasPromptColumn(columns)).toBe(false);
+    });
+
+    it("signed out rows come back without promptText", async () => {
+      const { prompt: _omit, ...publicRow } = mockDbPrompts[0];
+      const limitMock = vi.fn().mockResolvedValue({ data: [publicRow], error: null });
+      const selectMock = vi.fn().mockReturnValue({ order: vi.fn().mockReturnValue({ limit: limitMock }) });
+      vi.mocked(supabase.from).mockReturnValue({ select: selectMock } as never);
+
+      const { prompts } = await getAllPrompts(10);
+
+      expect(prompts[0].promptText).toBeUndefined();
     });
   });
 

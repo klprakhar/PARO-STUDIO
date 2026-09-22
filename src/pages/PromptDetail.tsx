@@ -18,6 +18,7 @@ import { AuthModal } from "@/components/auth/AuthModal";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import type { PromptWithDetails } from "@/hooks/usePrompts";
 import { getAllPrompts, getPrompt, incrementCopyCount } from "@/services/supabase/prompts";
+import { copyPromptText } from "@/lib/copyPromptText";
 import { getProfile, getProfilesByIds } from "@/services/supabase/profiles";
 import { getLikeCount, getLikeCounts, getLikedPromptIds, isLiked as checkIsLiked } from "@/services/supabase/likes";
 import { getSavedPromptIds, isSaved as checkIsSaved } from "@/services/supabase/saves";
@@ -57,7 +58,7 @@ export default function PromptDetail() {
       if (!id) return null;
 
       // Get prompt from Supabase
-      const { prompt: data, error } = await getPrompt(id);
+      const { prompt: data, error } = await getPrompt(id, !!user); // text only when signed in
       
       if (error || !data) {
         console.error('Error fetching prompt:', error);
@@ -79,7 +80,7 @@ export default function PromptDetail() {
       const result = {
         id: data.id,
         title: data.title,
-        promptText: data.prompt,
+        promptText: 'prompt' in data ? data.prompt : undefined,
         imageUrl: data.image_url,
         toolUsed: data.ai_tool,
         viewCount: data.view_count || 0,
@@ -113,10 +114,14 @@ export default function PromptDetail() {
     // Show that straight away while the full details load behind it.
     placeholderData: () => {
       if (!id) return undefined;
+      // Only borrow from lists cached for the same viewer. Their key ends with
+      // the viewer id, and a list from another sign in state carries the wrong
+      // like and save state, and no prompt text when it was loaded signed out.
+      const viewer = user?.id ?? null;
       const lists = [
         ...queryClient.getQueriesData<PromptWithDetails[]>({ queryKey: ["prompts"] }),
         ...queryClient.getQueriesData<PromptWithDetails[]>({ queryKey: ["profile-prompts"] }),
-      ];
+      ].filter(([key]) => (key[key.length - 1] ?? null) === viewer);
       for (const [, list] of lists) {
         const match = Array.isArray(list) ? list.find((p) => p.id === id) : undefined;
         if (match) return match;
@@ -145,7 +150,7 @@ export default function PromptDetail() {
       if (!prompt?.tags || prompt.tags.length === 0 || !id) return [];
 
       // Get related prompts from Supabase
-      const { prompts: relatedPrompts, error: relatedError } = await getAllPrompts(50);
+      const { prompts: relatedPrompts, error: relatedError } = await getAllPrompts(50, !!user);
       
       if (relatedError) {
         console.error('Error fetching related prompts:', relatedError);
@@ -216,7 +221,16 @@ export default function PromptDetail() {
       return;
     }
 
-    await navigator.clipboard.writeText(prompt.promptText);
+    // Static import on purpose. Anything awaited before the clipboard write
+    // can make Safari treat it as outside the tap and refuse it.
+    if (!(await copyPromptText(prompt.id, prompt.promptText))) {
+      toast({
+        title: "Couldn't copy the prompt",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
     setCopied(true);
 
     await incrementCopyCount(prompt.id);
@@ -229,10 +243,7 @@ export default function PromptDetail() {
 
   const handleLike = async () => {
     if (!user) {
-      toast({
-        title: "Sign in required",
-        description: "Please sign in to like prompts",
-      });
+      setAuthModalOpen(true);
       return;
     }
 
@@ -243,10 +254,7 @@ export default function PromptDetail() {
 
   const handleSave = async () => {
     if (!user) {
-      toast({
-        title: "Sign in required",
-        description: "Please sign in to save prompts",
-      });
+      setAuthModalOpen(true);
       return;
     }
 
@@ -258,10 +266,6 @@ export default function PromptDetail() {
   const handleRate = async (rating: number) => {
     if (!user) {
       setAuthModalOpen(true);
-      toast({
-        title: "Sign in required",
-        description: "Please sign in to rate prompt accuracy",
-      });
       return;
     }
 

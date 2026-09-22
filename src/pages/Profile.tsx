@@ -59,7 +59,7 @@ export default function Profile() {
       if (!profile?.id) return [];
 
       // Get prompts from Supabase
-      const { prompts: userPrompts, error } = await getUserPrompts(profile.id);
+      const { prompts: userPrompts, error } = await getUserPrompts(profile.id, !!user); // text only when signed in
 
       if (error) {
         console.error('Error fetching user prompts:', error);
@@ -147,10 +147,7 @@ export default function Profile() {
 
   const handleFollow = async () => {
     if (!user) {
-      toast({
-        title: "Sign in required",
-        description: "Please sign in to follow creators",
-      });
+      setAuthModalOpen(true);
       return;
     }
 
