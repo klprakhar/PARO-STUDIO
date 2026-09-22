@@ -12,7 +12,9 @@
 -- user id to copy anywhere. Sign up first or it will tell you to.
 --
 -- Images come from picsum.photos, a free placeholder service. Nothing here is
--- real user data and nothing comes from parostudios.in.
+-- real user data and nothing comes from parostudios.in. The app only accepts
+-- prompt images from your own storage bucket, but that rule applies to the API,
+-- not the SQL editor, so these placeholders still go in.
 --
 -- Safe to run more than once. It clears its own sample rows first.
 

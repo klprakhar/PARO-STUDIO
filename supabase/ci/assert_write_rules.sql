@@ -1,8 +1,9 @@
 -- CI ONLY. Acts as a signed in user and checks the write rules from
--- 20260922120000, 20260922120100 and 20260922120200 actually hold:
+-- 20260922120000, 20260922120100, 20260922120200 and 20260922140000 actually
+-- hold:
 --
---   1. created_at cannot be set by clients, and the daily upload limit cannot
---      be dodged by backdating
+--   1. created_at cannot be set by clients, the daily upload limit cannot be
+--      dodged by backdating, and prompt images must be in our storage
 --   2. profile fields follow the same rules as the forms
 --   3. storage uploads are limited by file name and, for prompt images, count
 --
@@ -129,6 +130,24 @@ begin
     $f$insert into public.prompts (user_id, title, prompt, image_url, ai_tool)
        values (%L, 't', 'p', %L, 'Midjourney')$f$, me, img),
     'P0001', 'a fourth upload in one day');
+
+  -- 1d. Prompt images must come from the uploader's own storage folder --------
+  perform pg_temp.expect_error(format(
+    $f$insert into public.prompts (user_id, title, prompt, image_url, ai_tool)
+       values (%L, 't', 'p', 'https://evil.example/pixel.gif', 'Midjourney')$f$, me),
+    '23514', 'a new prompt with an image on another server');
+  perform pg_temp.expect_error(format(
+    $f$update public.prompts set image_url = 'https://evil.example/pixel.gif' where user_id = %L$f$, me),
+    '23514', 'a prompt image on another server');
+  perform pg_temp.expect_error(format(
+    $f$update public.prompts set image_url = %L where user_id = %L$f$,
+    store || 'prompt-images/' || other || '/a.jpg', me),
+    '23514', 'a prompt image in someone else''s folder');
+  perform pg_temp.expect_error(format(
+    $f$update public.prompts set image_url = %L where user_id = %L$f$,
+    store || 'prompt-images/' || me || '/a/b.jpg', me),
+    '23514', 'a prompt image in a subfolder');
+  update public.prompts set image_url = store || 'prompt-images/' || me || '/new.webp' where user_id = me::uuid;
 
   -- 2. Profile fields ---------------------------------------------------------
   perform pg_temp.expect_error(format($f$update public.profiles set username = 'Write_rules' where id = %L$f$, me),
