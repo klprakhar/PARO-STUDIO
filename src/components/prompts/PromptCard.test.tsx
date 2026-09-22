@@ -37,7 +37,6 @@ describe("PromptCard", () => {
   const baseProps = {
     id: "prompt-1",
     title: "Cinematic portrait",
-    promptText: "A realistic portrait, 8k, photorealistic",
     imageUrl: "https://example.test/portrait.png",
     toolUsed: "Midjourney",
     copyCount: 12,

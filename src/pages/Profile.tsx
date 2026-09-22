@@ -59,7 +59,7 @@ export default function Profile() {
       if (!profile?.id) return [];
 
       // Get prompts from Supabase
-      const { prompts: userPrompts, error } = await getUserPrompts(profile.id, !!user); // text only when signed in
+      const { prompts: userPrompts, error } = await getUserPrompts(profile.id);
 
       if (error) {
         console.error('Error fetching user prompts:', error);
@@ -90,7 +90,6 @@ export default function Profile() {
         return {
           id: p.id,
           title: p.title,
-          promptText: p.promptText,
           imageUrl: p.imageUrl,
           toolUsed: p.toolUsed,
           viewCount: p.viewCount || 0,
@@ -308,7 +307,6 @@ export default function Profile() {
                     <PromptCard
                       id={prompt.id}
                       title={prompt.title}
-                      promptText={prompt.promptText}
                       imageUrl={prompt.imageUrl}
                       toolUsed={prompt.toolUsed}
                       viewCount={prompt.viewCount}
@@ -345,7 +343,6 @@ export default function Profile() {
           prompt={{
             id: editingPrompt.id,
             title: editingPrompt.title,
-            prompt_text: editingPrompt.promptText,
             image_url: editingPrompt.imageUrl,
             tool_used: editingPrompt.toolUsed,
             tags: editingPrompt.tags,

@@ -1,26 +1,33 @@
 import { getPromptText } from "@/services/supabase/prompts";
 
 /**
- * Copies a prompt's text to the clipboard. Returns false if it could not.
+ * Fetches a prompt's text and copies it to the clipboard. Returns false if it
+ * could not.
  *
- * Signed in lists already carry the text, so the normal case writes straight
- * away inside the tap. The fetch is a fallback for the moment a page is still
- * showing card data from a signed out cache. Safari may refuse that write,
- * because the tap no longer counts after a network wait, so callers must
- * handle false rather than assume the copy worked.
+ * The text is never loaded with the feed or the prompt page, only here, when a
+ * signed in user taps Copy. That keeps it out of the network tab until someone
+ * actually copies.
+ *
+ * Safari only allows a clipboard write during the tap, and a network wait ends
+ * the tap. A ClipboardItem built from a promise gets around that: the write is
+ * started straight away, inside the tap, and the browser waits for the text.
+ * So nothing may be awaited before `clipboard.write` below. Browsers without
+ * ClipboardItem fall back to fetching first and then writeText, which works
+ * everywhere except old Safari.
  */
-export async function copyPromptText(promptId: string, knownText?: string): Promise<boolean> {
+export async function copyPromptText(promptId: string): Promise<boolean> {
+  const text = getPromptText(promptId).then(({ text }) => {
+    if (!text) throw new Error("Prompt text unavailable");
+    return text;
+  });
+
   try {
-    let text = knownText;
-
-    if (!text) {
-      const { text: fetched } = await getPromptText(promptId);
-      text = fetched ?? undefined;
+    if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+      const blob = text.then(t => new Blob([t], { type: "text/plain" }));
+      await navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })]);
+    } else {
+      await navigator.clipboard.writeText(await text);
     }
-
-    if (!text) return false;
-
-    await navigator.clipboard.writeText(text);
     return true;
   } catch (error) {
     console.error("Copy prompt failed:", error);

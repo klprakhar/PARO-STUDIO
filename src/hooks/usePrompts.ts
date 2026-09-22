@@ -13,8 +13,6 @@ import { promptsQueryKey } from "@/hooks/queryKeys";
 export interface PromptWithDetails {
   id: string;
   title: string;
-  /** Only loaded for signed in viewers. */
-  promptText?: string;
   imageUrl: string;
   toolUsed: string;
   viewCount: number;
@@ -57,7 +55,6 @@ export function usePrompts(options?: {
         const query = searchQuery.toLowerCase();
         filtered = filtered.filter(p =>
           p.title.toLowerCase().includes(query) ||
-          (p.promptText ?? '').toLowerCase().includes(query) ||
           p.tags.some(t => t.toLowerCase().includes(query))
         );
       }
@@ -90,7 +87,7 @@ export function usePrompts(options?: {
     // The user id is in the key because isLiked and isSaved depend on it.
     queryKey: promptsQueryKey(limit, user?.id),
     queryFn: async () => {
-      const { prompts: allPrompts, error } = await getAllPrompts(limit * 2, !!user); // Get more for filtering. Text only when signed in
+      const { prompts: allPrompts, error } = await getAllPrompts(limit * 2); // Get more for filtering
 
       if (error) {
         console.error('Error fetching prompts:', error);
@@ -118,7 +115,6 @@ export function usePrompts(options?: {
         return {
           id: p.id,
           title: p.title,
-          promptText: p.promptText,
           imageUrl: p.imageUrl,
           toolUsed: p.toolUsed,
           viewCount: p.viewCount || 0,

@@ -56,7 +56,7 @@ describe("prompts service", () => {
   });
 
   describe("getAllPrompts", () => {
-    it("returns normalized prompts with camelCase properties when signed in", async () => {
+    it("returns normalized prompts with camelCase properties", async () => {
       const limitMock = vi.fn().mockResolvedValue({
         data: mockDbPrompts,
         error: null,
@@ -68,10 +68,9 @@ describe("prompts service", () => {
         select: selectMock,
       } as never);
 
-      const { prompts, error } = await getAllPrompts(25, true);
+      const { prompts, error } = await getAllPrompts(25);
 
       expect(supabase.from).toHaveBeenCalledWith("prompts");
-      expect(selectMock.mock.calls[0][0]).toMatch(/\bprompt\b/);
       expect(orderMock).toHaveBeenCalledWith("created_at", { ascending: false });
       expect(limitMock).toHaveBeenCalledWith(25);
       expect(error).toBeNull();
@@ -80,7 +79,6 @@ describe("prompts service", () => {
           id: "prompt-1",
           userId: "user-1",
           title: "Cyberpunk City",
-          promptText: "A neon city in 2077",
           imageUrl: "https://example.com/cyberpunk.png",
           toolUsed: "Midjourney",
           tags: ["cyberpunk", "city"],
@@ -92,7 +90,6 @@ describe("prompts service", () => {
           id: "prompt-2",
           userId: "user-2",
           title: "Watercolor Landscape",
-          promptText: "Serene mountain lake",
           imageUrl: "https://example.com/landscape.png",
           toolUsed: "DALL-E",
           tags: ["art", "nature"],
@@ -148,7 +145,7 @@ describe("prompts service", () => {
   });
 
   describe("getUserPrompts", () => {
-    it("returns normalized prompts for given userId when signed in", async () => {
+    it("returns normalized prompts for given userId", async () => {
       const orderMock = vi.fn().mockResolvedValue({
         data: [mockDbPrompts[0]],
         error: null,
@@ -160,10 +157,9 @@ describe("prompts service", () => {
         select: selectMock,
       } as never);
 
-      const { prompts, error } = await getUserPrompts("user-1", true);
+      const { prompts, error } = await getUserPrompts("user-1");
 
       expect(supabase.from).toHaveBeenCalledWith("prompts");
-      expect(selectMock.mock.calls[0][0]).toMatch(/\bprompt\b/);
       expect(eqMock).toHaveBeenCalledWith("user_id", "user-1");
       expect(orderMock).toHaveBeenCalledWith("created_at", { ascending: false });
       expect(error).toBeNull();
@@ -172,7 +168,6 @@ describe("prompts service", () => {
           id: "prompt-1",
           userId: "user-1",
           title: "Cyberpunk City",
-          promptText: "A neon city in 2077",
           imageUrl: "https://example.com/cyberpunk.png",
           toolUsed: "Midjourney",
           tags: ["cyberpunk", "city"],
@@ -184,10 +179,10 @@ describe("prompts service", () => {
     });
   });
 
-  // The database refuses prompts.prompt to signed out visitors, and a signed out
-  // select("*") on prompts fails outright. These pin both rules: never "*", and
-  // no prompt column unless the caller says the viewer is signed in.
-  describe("signed out queries never ask for the prompt text", () => {
+  // The text is only loaded by getPromptText, on Copy or edit. The database
+  // refuses prompts.prompt to signed out visitors, and a signed out select("*")
+  // on prompts fails outright. These pin both: never "*", never the prompt.
+  describe("list and detail queries never ask for the prompt text", () => {
     const hasPromptColumn = (columns: string) =>
       columns.split(",").map((c) => c.trim()).includes("prompt");
 
@@ -226,17 +221,6 @@ describe("prompts service", () => {
       const columns = selectMock.mock.calls[0][0] as string;
       expect(columns).not.toBe("*");
       expect(hasPromptColumn(columns)).toBe(false);
-    });
-
-    it("signed out rows come back without promptText", async () => {
-      const { prompt: _omit, ...publicRow } = mockDbPrompts[0];
-      const limitMock = vi.fn().mockResolvedValue({ data: [publicRow], error: null });
-      const selectMock = vi.fn().mockReturnValue({ order: vi.fn().mockReturnValue({ limit: limitMock }) });
-      vi.mocked(supabase.from).mockReturnValue({ select: selectMock } as never);
-
-      const { prompts } = await getAllPrompts(10);
-
-      expect(prompts[0].promptText).toBeUndefined();
     });
   });
 

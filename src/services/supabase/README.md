@@ -29,10 +29,10 @@ const { data, error } = await supabase
   .limit(10);
 ```
 
-Do not `select('*')` on `prompts` in anything a signed out visitor can reach.
-The prompt text is sign in only, the database refuses `prompts.prompt` to
-signed out users, so a `*` query fails outright for them. Use the helpers in
-`prompts.ts`, which list their columns and only add `prompt` when signed in.
+Do not `select('*')` on `prompts`, and do not add `prompt` to list or detail
+queries. The prompt text is only loaded by `getPromptText` in `prompts.ts`, when
+a signed in user taps Copy or edits their own prompt. The database refuses
+`prompts.prompt` to signed out users, so a `*` query fails outright for them.
 
 ## File Structure
 

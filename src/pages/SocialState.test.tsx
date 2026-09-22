@@ -26,7 +26,7 @@ vi.mock("@/services/supabase/follows", () => ({
 vi.mock("@/services/supabase/client", () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }));
 
 const prompt = {
-  id: "prompt-1", title: "Cached portrait", promptText: "A portrait",
+  id: "prompt-1", title: "Cached portrait",
   imageUrl: "https://example.test/portrait.png", toolUsed: "Test", tags: [],
   viewCount: 10, copyCount: 3, createdAt: "2026-01-01T00:00:00Z",
   creator: { id: "creator", username: "artist", displayName: "Artist", avatarUrl: null, verified: false },

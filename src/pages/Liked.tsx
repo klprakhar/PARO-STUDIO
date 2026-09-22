@@ -45,7 +45,6 @@ export default function Liked() {
         return {
           id: p.id,
           title: p.title,
-          promptText: p.promptText,
           imageUrl: p.imageUrl,
           toolUsed: p.toolUsed,
           viewCount: p.viewCount || 0,
@@ -137,7 +136,6 @@ export default function Liked() {
                   key={prompt.id}
                   id={prompt.id}
                   title={prompt.title}
-                  promptText={prompt.promptText}
                   imageUrl={prompt.imageUrl}
                   toolUsed={prompt.toolUsed}
                   viewCount={prompt.viewCount}

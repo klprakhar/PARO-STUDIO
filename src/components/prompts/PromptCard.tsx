@@ -31,8 +31,6 @@ import {
 interface PromptCardProps {
   id: string;
   title: string;
-  /** Only loaded for signed in viewers. Copy fetches it if it is missing. */
-  promptText?: string;
   imageUrl: string;
   toolUsed: string;
   viewCount?: number | null;
@@ -71,7 +69,6 @@ interface PromptCardProps {
 export function PromptCard({
   id,
   title,
-  promptText,
   imageUrl,
   toolUsed,
   viewCount,
@@ -130,9 +127,9 @@ export function PromptCard({
       return;
     }
 
-    // Static import on purpose. Anything awaited before the clipboard write
-    // can make Safari treat it as outside the tap and refuse it.
-    if (!(await copyPromptText(id, promptText))) {
+    // Static import on purpose. Anything awaited before copyPromptText starts
+    // the clipboard write can make Safari treat it as outside the tap.
+    if (!(await copyPromptText(id))) {
       toast({
         title: "Couldn't copy the prompt",
         description: "Please try again.",

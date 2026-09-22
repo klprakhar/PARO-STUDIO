@@ -73,7 +73,6 @@ export default function Index() {
       result = result.filter(
         (p) =>
           p.title.toLowerCase().includes(query) ||
-          (p.promptText ?? '').toLowerCase().includes(query) ||  // signed in only
           p.tags.some((tag) => tag.toLowerCase().includes(query))
       );
     }

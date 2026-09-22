@@ -184,7 +184,6 @@ describe("PromptDetail", () => {
         {
           id: "prompt-1",
           title: "Cached card",
-          promptText: "A test prompt",
           imageUrl: "https://example.test/prompt.png",
           toolUsed: "Test tool",
           viewCount: 3,

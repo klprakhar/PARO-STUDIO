@@ -8,7 +8,7 @@ import PromptDetail from "./PromptDetail";
 import { supabase } from "@/services/supabase/client";
 
 const mocks = vi.hoisted(() => ({ profiles: vi.fn(), counts: vi.fn(), liked: vi.fn(), saved: vi.fn(), ratings: vi.fn(), profile: vi.fn() }));
-const prompts = Array.from({ length: 60 }, (_, index) => ({ id: `p${index}`, userId: "creator", title: `Prompt ${index}`, promptText: "Text", imageUrl: "image.png", toolUsed: "Test", tags: ["portrait"], createdAt: "2026-01-01", viewCount: 0, copyCount: 0 }));
+const prompts = Array.from({ length: 60 }, (_, index) => ({ id: `p${index}`, userId: "creator", title: `Prompt ${index}`, imageUrl: "image.png", toolUsed: "Test", tags: ["portrait"], createdAt: "2026-01-01", viewCount: 0, copyCount: 0 }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "viewer" }, session: { user: { id: "viewer" } }, profile: { id: "viewer" }, loading: false }) }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock("@/services/supabase/client", () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }));
@@ -26,7 +26,7 @@ describe("card enrichment across collections and recommendations", () => {
     vi.clearAllMocks();
     const builder = {
       select: () => builder, order: () => builder, limit: () => builder,
-      then: (resolve: (value: unknown) => unknown) => Promise.resolve({ data: prompts.map(p => ({ id: p.id, user_id: p.userId, title: p.title, prompt: p.promptText, image_url: p.imageUrl, ai_tool: p.toolUsed, tags: p.tags, created_at: p.createdAt })), error: null }).then(resolve),
+      then: (resolve: (value: unknown) => unknown) => Promise.resolve({ data: prompts.map(p => ({ id: p.id, user_id: p.userId, title: p.title, image_url: p.imageUrl, ai_tool: p.toolUsed, tags: p.tags, created_at: p.createdAt })), error: null }).then(resolve),
     };
     vi.mocked(supabase.from).mockReturnValue(builder as unknown as ReturnType<typeof supabase.from>);
     vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: null });

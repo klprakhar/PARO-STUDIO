@@ -58,7 +58,7 @@ export default function PromptDetail() {
       if (!id) return null;
 
       // Get prompt from Supabase
-      const { prompt: data, error } = await getPrompt(id, !!user); // text only when signed in
+      const { prompt: data, error } = await getPrompt(id);
       
       if (error || !data) {
         console.error('Error fetching prompt:', error);
@@ -80,7 +80,6 @@ export default function PromptDetail() {
       const result = {
         id: data.id,
         title: data.title,
-        promptText: 'prompt' in data ? data.prompt : undefined,
         imageUrl: data.image_url,
         toolUsed: data.ai_tool,
         viewCount: data.view_count || 0,
@@ -116,7 +115,7 @@ export default function PromptDetail() {
       if (!id) return undefined;
       // Only borrow from lists cached for the same viewer. Their key ends with
       // the viewer id, and a list from another sign in state carries the wrong
-      // like and save state, and no prompt text when it was loaded signed out.
+      // like and save state.
       const viewer = user?.id ?? null;
       const lists = [
         ...queryClient.getQueriesData<PromptWithDetails[]>({ queryKey: ["prompts"] }),
@@ -150,7 +149,7 @@ export default function PromptDetail() {
       if (!prompt?.tags || prompt.tags.length === 0 || !id) return [];
 
       // Get related prompts from Supabase
-      const { prompts: relatedPrompts, error: relatedError } = await getAllPrompts(50, !!user);
+      const { prompts: relatedPrompts, error: relatedError } = await getAllPrompts(50);
       
       if (relatedError) {
         console.error('Error fetching related prompts:', relatedError);
@@ -180,7 +179,6 @@ export default function PromptDetail() {
           return {
             id: p.id,
             title: p.title,
-            promptText: p.promptText,
             imageUrl: p.imageUrl,
             toolUsed: p.toolUsed,
             viewCount: p.viewCount || 0,
@@ -221,9 +219,9 @@ export default function PromptDetail() {
       return;
     }
 
-    // Static import on purpose. Anything awaited before the clipboard write
-    // can make Safari treat it as outside the tap and refuse it.
-    if (!(await copyPromptText(prompt.id, prompt.promptText))) {
+    // Static import on purpose. Anything awaited before copyPromptText starts
+    // the clipboard write can make Safari treat it as outside the tap.
+    if (!(await copyPromptText(prompt.id))) {
       toast({
         title: "Couldn't copy the prompt",
         description: "Please try again.",
@@ -616,7 +614,6 @@ export default function PromptDetail() {
                       key={rec.id}
                       id={rec.id}
                       title={rec.title}
-                      promptText={rec.promptText}
                       imageUrl={rec.imageUrl}
                       toolUsed={rec.toolUsed}
                       viewCount={rec.viewCount}
