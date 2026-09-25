@@ -12,6 +12,7 @@ import { ReportPromptDialog } from "@/components/prompts/ReportPromptDialog";
 import { AiToolBadge } from "@/components/prompts/AiToolBadge";
 import { useQueryClient } from "@tanstack/react-query";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { PromptCarousel } from "@/components/prompts/PromptCarousel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +33,7 @@ interface PromptCardProps {
   id: string;
   title: string;
   imageUrl: string;
+  imageUrls?: string[];
   toolUsed: string;
   viewCount?: number | null;
   copyCount?: number | null;
@@ -70,6 +72,7 @@ export function PromptCard({
   id,
   title,
   imageUrl,
+  imageUrls,
   toolUsed,
   viewCount,
   copyCount,
@@ -221,20 +224,15 @@ export function PromptCard({
   return (
     <article className="group masonry-item">
       <div className="relative overflow-hidden rounded-xl bg-card hover-lift">
-        {/* Image */}
-        <Link to={`/prompt/${id}`} className="block">
-          <div className="relative aspect-auto">
-            <img
-              src={imageUrl}
-              alt={title}
-              className="w-full h-auto object-cover transition-transform duration-medium group-hover:scale-[1.02]"
-              loading={priority ? "eager" : "lazy"}
-            />
-
-            {/* Overlay on hover */}
-            <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/10 transition-colors duration-medium pointer-events-none" />
-          </div>
-        </Link>
+        {/* 4-Image Carousel */}
+        <PromptCarousel
+          imageUrl={imageUrl}
+          imageUrls={imageUrls}
+          alt={title}
+          linkTo={`/prompt/${id}`}
+          priority={priority}
+          variant="card"
+        />
 
         {/* Mobile three-dot menu trigger - top RIGHT, inside image */}
         <div

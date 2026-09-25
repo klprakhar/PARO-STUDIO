@@ -9,6 +9,7 @@ export interface ImageFeedItem {
     id: string;
     title: string;
     image_url: string;
+    image_urls?: string[];
     tool_used: string;
     view_count: number;
     copy_count: number;
@@ -83,6 +84,7 @@ export function toImageFeedItem(prompt: {
   id: string;
   title: string;
   imageUrl: string;    // camelCase from usePrompts
+  imageUrls?: string[];
   toolUsed: string;    // camelCase from usePrompts
   viewCount: number;
   copyCount: number;
@@ -107,6 +109,7 @@ export function toImageFeedItem(prompt: {
       id: prompt.id,
       title: prompt.title,
       image_url: prompt.imageUrl,              // Transform to snake_case
+      image_urls: prompt.imageUrls,
       tool_used: prompt.toolUsed,              // Transform to snake_case
       view_count: prompt.viewCount,
       copy_count: prompt.copyCount,

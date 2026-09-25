@@ -190,6 +190,7 @@ export type Database = {
       }
       prompt_counter_events: {
         Row: {
+<<<<<<< HEAD
           actor: string
           counted_at: string
           kind: string
@@ -206,6 +207,48 @@ export type Database = {
           counted_at?: string
           kind?: string
           prompt_id?: string
+=======
+          ai_tool: string
+          copy_count: number
+          created_at: string
+          id: string
+          image_url: string
+          image_urls: string[] | null
+          prompt: string
+          tags: string[] | null
+          title: string
+          updated_at: string
+          user_id: string
+          view_count: number
+        }
+        Insert: {
+          ai_tool: string
+          copy_count?: number
+          created_at?: string
+          id?: string
+          image_url: string
+          image_urls?: string[] | null
+          prompt: string
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+          user_id: string
+          view_count?: number
+        }
+        Update: {
+          ai_tool?: string
+          copy_count?: number
+          created_at?: string
+          id?: string
+          image_url?: string
+          image_urls?: string[] | null
+          prompt?: string
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+          view_count?: number
+>>>>>>> b08456c (added corousel)
         }
         Relationships: [
           {

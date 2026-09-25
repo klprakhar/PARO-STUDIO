@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { SharePromptDialog } from "@/components/prompts/SharePromptDialog";
 import { cn } from "@/lib/utils";
 import { PromptCard } from "@/components/prompts/PromptCard";
+import { PromptCarousel } from "@/components/prompts/PromptCarousel";
 import { AuthModal } from "@/components/auth/AuthModal";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import type { PromptWithDetails } from "@/hooks/usePrompts";
@@ -77,10 +78,28 @@ export default function PromptDetail() {
       ]);
 
       // Normalize to clean camelCase UI shape - NO spread operator
+      const raw = data as Record<string, unknown>;
+      let rawUrls = Array.isArray(raw.image_urls) ? (raw.image_urls as string[]) : undefined;
+      let firstImageUrl = data.image_url;
+
+      if (typeof data.image_url === 'string' && data.image_url.includes('|||')) {
+        const parts = data.image_url.split('|||').map((s: string) => s.trim()).filter(Boolean);
+        firstImageUrl = parts[0];
+        if (!rawUrls || rawUrls.length === 0) {
+          rawUrls = parts;
+        }
+      }
+
       const result = {
         id: data.id,
         title: data.title,
+<<<<<<< HEAD
         imageUrl: data.image_url,
+=======
+        promptText: data.prompt,
+        imageUrl: firstImageUrl,
+        imageUrls: rawUrls,
+>>>>>>> b08456c (added corousel)
         toolUsed: data.ai_tool,
         viewCount: data.view_count || 0,
         copyCount: data.copy_count || 0,
@@ -180,6 +199,7 @@ export default function PromptDetail() {
             id: p.id,
             title: p.title,
             imageUrl: p.imageUrl,
+            imageUrls: p.imageUrls,
             toolUsed: p.toolUsed,
             viewCount: p.viewCount || 0,
             copyCount: p.copyCount || 0,
@@ -369,13 +389,14 @@ export default function PromptDetail() {
 
             {/* Main content - side by side on desktop, stacked on mobile */}
             <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8 items-start">
-              {/* Image - constrained height with responsive sizing */}
+              {/* Image - 4-image carousel with responsive sizing */}
               <div className="w-full lg:w-2/5 flex items-start justify-center">
-                <img
-                  src={prompt.imageUrl}
+                <PromptCarousel
+                  imageUrl={prompt.imageUrl}
+                  imageUrls={prompt.imageUrls}
                   alt={prompt.title}
-                  className="max-h-[40vh] sm:max-h-[35vh] lg:max-h-[50vh] w-auto max-w-full object-contain rounded-xl shadow-card"
-                  loading="lazy"
+                  variant="detail"
+                  priority={true}
                 />
               </div>
 
@@ -615,6 +636,7 @@ export default function PromptDetail() {
                       id={rec.id}
                       title={rec.title}
                       imageUrl={rec.imageUrl}
+                      imageUrls={rec.imageUrls}
                       toolUsed={rec.toolUsed}
                       viewCount={rec.viewCount}
                       copyCount={rec.copyCount}

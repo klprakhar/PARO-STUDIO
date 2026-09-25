@@ -99,12 +99,30 @@ export async function getUserSaves(
   const prompts = (data || [])
     .filter(item => item.prompts !== null)
     .map(item => {
-      const p = item.prompts;
+      const p = item.prompts as any;
+      const raw = p as Record<string, unknown>;
+      let rawUrls = Array.isArray(raw.image_urls) ? (raw.image_urls as string[]) : undefined;
+      let firstImageUrl = p.image_url;
+
+      if (typeof p.image_url === 'string' && p.image_url.includes('|||')) {
+        const parts = p.image_url.split('|||').map((s: string) => s.trim()).filter(Boolean);
+        firstImageUrl = parts[0];
+        if (!rawUrls || rawUrls.length === 0) {
+          rawUrls = parts;
+        }
+      }
+
       return {
         id: p.id,
         userId: p.user_id,
         title: p.title,
+<<<<<<< HEAD
         imageUrl: p.image_url,
+=======
+        promptText: p.prompt,
+        imageUrl: firstImageUrl,
+        ...(rawUrls && rawUrls.length > 0 ? { imageUrls: rawUrls } : {}),
+>>>>>>> b08456c (added corousel)
         toolUsed: p.ai_tool,
         tags: p.tags || [],
         createdAt: p.created_at,

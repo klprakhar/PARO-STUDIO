@@ -1054,6 +1054,7 @@ end;
 $$;
 
 -- --------------------------------------------------------------------------
+<<<<<<< HEAD
 -- 20260922120000_stop_clients_setting_created_at.sql
 -- --------------------------------------------------------------------------
 
@@ -1420,6 +1421,7 @@ grant select (fts) on public.prompts to anon;
 -- containment (@>) and overlap (&&) operators without requiring any extension.
 
 create index if not exists prompts_tags_idx on public.prompts using gin (tags);
+<<<<<<< HEAD
 
 -- --------------------------------------------------------------------------
 -- 20260925000000_denormalized_counters_and_triggers.sql
@@ -1552,6 +1554,16 @@ set like_count = coalesce((select count(*) from public.likes l where l.prompt_id
 update public.profiles pr
 set follower_count = coalesce((select count(*) from public.follows f where f.following_id = pr.id), 0),
     following_count = coalesce((select count(*) from public.follows f where f.follower_id = pr.id), 0);
+=======
+=======
+-- 20260917000000_add_image_urls_to_prompts.sql
+-- --------------------------------------------------------------------------
+
+-- Add image_urls column to prompts to support multi-image prompt uploads
+alter table public.prompts
+  add column if not exists image_urls text[];
+>>>>>>> b08456c (added corousel)
+>>>>>>> c2b9fc0 (Add full-text search and tag indexes and search on the server (fixes #102))
 
 -- --------------------------------------------------------------------------
 -- After running this

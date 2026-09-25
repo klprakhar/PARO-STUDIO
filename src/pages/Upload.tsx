@@ -1,6 +1,6 @@
 import { PageSkeleton } from "@/components/PageSkeleton";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Navbar } from "@/components/layout/Navbar";
@@ -17,7 +17,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { X, ImageIcon, TrendingUp, AlertCircle, Clock, ShieldCheck } from "lucide-react";
+import { X, ImageIcon, TrendingUp, AlertCircle, Clock, ShieldCheck, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { STANDARD_TAGS } from "@/lib/standardTags";
 import { getErrorMessage } from "@/lib/errors";
 import { FEATURED_AI_TOOL, OTHER_AI_TOOLS } from "@/lib/aiTools";
@@ -32,8 +33,9 @@ export default function UploadPrompt() {
 
   const [title, setTitle] = useState("");
   const [promptText, setPromptText] = useState("");
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const isAppendingRef = useRef(false);
   const [toolUsed, setToolUsed] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
@@ -68,46 +70,82 @@ export default function UploadPrompt() {
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const rawFiles = Array.from(e.target.files || []);
+    if (rawFiles.length === 0) return;
 
-    // Validate file type
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      clearImage();
-      toast({
-        title: "Invalid file type",
-        description: "Please select a JPEG, PNG, or WebP image",
-        variant: "destructive",
-      });
-      return;
+    // Validate file type and size for all files
+    for (const file of rawFiles) {
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        clearAllImages();
+        toast({
+          title: "Invalid file type",
+          description: "Please select a JPEG, PNG, or WebP image",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (file.size > MAX_SOURCE_SIZE) {
+        toast({
+          title: "Image too large",
+          description: "That image is too large to process. Please use one under 25MB.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
-    if (file.size > MAX_SOURCE_SIZE) {
-      toast({
-        title: "Image too large",
-        description: "That image is too large to process. Please use one under 25MB.",
-        variant: "destructive",
-      });
-      return;
+    const isAppending = isAppendingRef.current;
+    isAppendingRef.current = false;
+
+    let targetFiles: File[];
+    if (isAppending) {
+      targetFiles = [...imageFiles, ...rawFiles].slice(0, 4);
+    } else {
+      targetFiles = rawFiles.slice(0, 4);
     }
 
-    setImageFile(file);
+    setImageFiles(targetFiles);
 
-    // Create preview
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
+    // Create previews
+    const previews: string[] = [];
+    let loadedCount = 0;
+    targetFiles.forEach((file, index) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        previews[index] = reader.result as string;
+        loadedCount++;
+        if (loadedCount === targetFiles.length) {
+          setImagePreviews([...previews]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
 
-  const clearImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
+
+  const removeImage = (indexToRemove: number) => {
+    const updatedFiles = imageFiles.filter((_, idx) => idx !== indexToRemove);
+    const updatedPreviews = imagePreviews.filter((_, idx) => idx !== indexToRemove);
+    setImageFiles(updatedFiles);
+    setImagePreviews(updatedPreviews);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const clearAllImages = () => {
+    setImageFiles([]);
+    setImagePreviews([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const clearImage = clearAllImages;
 
   const handleAddTag = () => {
     const tag = tagInput.toLowerCase().trim();
@@ -156,7 +194,7 @@ export default function UploadPrompt() {
     }
 
     // 3. Image required
-    if (!imageFile) {
+    if (imageFiles.length === 0) {
       toast({
         title: "Image required",
         description: "Please select an image to upload",
@@ -209,36 +247,24 @@ export default function UploadPrompt() {
     // ===== UPLOAD FLOW =====
 
     setIsSubmitting(true);
-    let uploadedImageUrl: string | null = null;
+    const uploadedUrls: string[] = [];
 
     try {
-      // STEP 1: Upload image to Supabase Storage
-      const { uploadPromptImage } = await import('@/services/supabase/storage');
+      // STEP 1: Upload images to Supabase Storage (up to 4 images)
+      const { uploadPromptImage, deletePromptImage } = await import('@/services/supabase/storage');
 
-      let url: string | null = null;
-      let uploadError: string | null = null;
       setIsUploading(true);
       try {
-        const result = await uploadPromptImage(
-          user.id,
-          imageFile
-        );
-        url = result.url;
-        uploadError = result.error;
+        for (const file of imageFiles) {
+          const result = await uploadPromptImage(user.id, file);
+          if (result.error || !result.url) {
+            throw new Error(result.error || "Could not upload image to storage");
+          }
+          uploadedUrls.push(result.url);
+        }
       } finally {
         setIsUploading(false);
       }
-
-      if (uploadError || !url) {
-        toast({
-          title: "Image upload failed",
-          description: uploadError || "Could not upload image to storage",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      uploadedImageUrl = url;
 
       // STEP 2: Insert into database with explicit user_id
       const { createPrompt } = await import('@/services/supabase/prompts');
@@ -247,7 +273,8 @@ export default function UploadPrompt() {
         user_id: user.id, // CRITICAL: explicit user_id for RLS
         title: title.trim(),
         prompt: promptText.trim(),
-        image_url: uploadedImageUrl,
+        image_url: uploadedUrls[0],
+        image_urls: uploadedUrls,
         ai_tool: actualTool,
         tags: tags
       });
@@ -255,9 +282,10 @@ export default function UploadPrompt() {
       if (dbError || !prompt) {
         console.error('❌ Database insert failed:', dbError);
 
-        // CLEANUP: Delete uploaded image since DB insert failed (only for stored images)
-        const { deletePromptImage } = await import('@/services/supabase/storage');
-        await deletePromptImage(uploadedImageUrl);
+        // CLEANUP: Delete uploaded images since DB insert failed
+        for (const url of uploadedUrls) {
+          await deletePromptImage(url).catch(() => {});
+        }
 
         const isLimitError = dbError?.code === 'P0001' || dbError?.message?.includes('Daily prompt upload limit');
         toast({
@@ -306,13 +334,15 @@ export default function UploadPrompt() {
     } catch (error) {
       console.error('❌ Unexpected upload error:', error);
 
-      // CLEANUP: If we uploaded an image to storage but error occurred, clean it up
-      if (uploadedImageUrl) {
+      // CLEANUP: If we uploaded images to storage but error occurred, clean them up
+      if (uploadedUrls.length > 0) {
         try {
           const { deletePromptImage } = await import('@/services/supabase/storage');
-          await deletePromptImage(uploadedImageUrl);
+          for (const url of uploadedUrls) {
+            await deletePromptImage(url).catch(() => {});
+          }
         } catch (cleanupError) {
-          console.error('❌ Failed to cleanup image:', cleanupError);
+          console.error('❌ Failed to cleanup images:', cleanupError);
         }
       }
 
@@ -405,44 +435,51 @@ export default function UploadPrompt() {
             <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
               {/* Image Upload */}
               <div className="space-y-2">
-                <Label className="text-sm sm:text-base">Image</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm sm:text-base">
+                    Images <span className="text-xs font-normal text-muted-foreground">(up to 4)</span>
+                  </Label>
+                  {imagePreviews.length > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      {imagePreviews.length} of 4 selected
+                    </span>
+                  )}
+                </div>
 
                 <input
                   ref={fileInputRef}
                   type="file"
+                  multiple
                   accept={ALLOWED_TYPES.join(",")}
                   onChange={handleFileSelect}
                   className="hidden"
                 />
 
-                {!imagePreview ? (
+                {imagePreviews.length === 0 ? (
                   <button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => {
+                      isAppendingRef.current = false;
+                      fileInputRef.current?.click();
+                    }}
                     className="w-full h-36 sm:h-48 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-2 sm:gap-3 hover:border-accent transition-colors bg-secondary/30 touch-target"
                   >
                     <ImageIcon className="h-8 sm:h-10 w-8 sm:w-10 text-muted-foreground" />
                     <div className="text-center px-4">
-                      <p className="text-xs sm:text-sm font-medium">Click to upload image</p>
-                      <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WEBP up to 3MB</p>
+                      <p className="text-xs sm:text-sm font-medium">Click to upload images (up to 4)</p>
+                      <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WEBP &bull; Select up to 4 images</p>
                     </div>
                   </button>
                 ) : (
-                  <div className="relative">
-                    <img
-                      src={imagePreview}
-                      alt="Preview"
-                      className="w-full max-h-48 sm:max-h-64 object-contain bg-secondary rounded-xl"
-                    />
-                    <button
-                      type="button"
-                      onClick={clearImage}
-                      className="absolute top-2 right-2 p-1.5 bg-background/80 rounded-sm hover:bg-background transition-colors touch-target"
-                      aria-label="Remove image"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
+                  <UploadCarouselPreview
+                    previews={imagePreviews}
+                    onRemove={removeImage}
+                    onClearAll={clearAllImages}
+                    onAddMore={() => {
+                      isAppendingRef.current = true;
+                      fileInputRef.current?.click();
+                    }}
+                  />
                 )}
               </div>
 
@@ -598,11 +635,11 @@ export default function UploadPrompt() {
                   !toolUsed ||
                   (toolUsed === "Other" && !customTool.trim()) ||
                   tags.length < 3 ||
-                  !imageFile
+                  imageFiles.length === 0
                 }
               >
                 {isUploading
-                  ? "Uploading image..."
+                  ? `Uploading image${imageFiles.length > 1 ? "s" : ""} (${imageFiles.length})...`
                   : isSubmitting
                     ? "Saving..."
                     : isCheckingLimit
@@ -617,6 +654,158 @@ export default function UploadPrompt() {
       </main>
 
       <Footer />
+    </div>
+  );
+}
+
+/* ─── Upload Carousel Preview ────────────────────────────────────────────── */
+
+interface UploadCarouselPreviewProps {
+  previews: string[];
+  onRemove: (index: number) => void;
+  onClearAll: () => void;
+  onAddMore: () => void;
+}
+
+function UploadCarouselPreview({ previews, onRemove, onClearAll, onAddMore }: UploadCarouselPreviewProps) {
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  // Keep activeIndex in bounds when images are removed
+  const safeIndex = Math.min(activeIndex, previews.length - 1);
+
+  const goToPrev = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setActiveIndex((i) => Math.max(0, i - 1));
+    },
+    []
+  );
+
+  const goToNext = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setActiveIndex((i) => Math.min(previews.length - 1, i + 1));
+    },
+    [previews.length]
+  );
+
+  const handleRemove = (e: React.MouseEvent, idx: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onRemove(idx);
+    // Adjust index after removal
+    if (idx <= safeIndex && safeIndex > 0) {
+      setActiveIndex(safeIndex - 1);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Carousel Viewport */}
+      <div className="relative rounded-xl overflow-hidden bg-secondary border border-border/50 select-none">
+        {/* Sliding track */}
+        <div
+          className="flex transition-transform duration-300 ease-out"
+          style={{ transform: `translateX(-${safeIndex * 100}%)` }}
+        >
+          {previews.map((preview, idx) => (
+            <div key={idx} className="w-full flex-shrink-0 relative">
+              <img
+                src={preview}
+                alt={idx === 0 ? "Cover image preview" : `Preview image ${idx + 1}`}
+                className="w-full max-h-64 sm:max-h-80 object-contain bg-secondary"
+              />
+              {/* Label badge */}
+              <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-background/90 text-foreground text-[11px] font-medium backdrop-blur-sm border border-border/40">
+                {idx === 0 ? "Cover Image" : `Image ${idx + 1} of ${previews.length}`}
+              </div>
+              {/* Remove button */}
+              <button
+                type="button"
+                onClick={(e) => handleRemove(e, idx)}
+                className="absolute top-2 right-2 p-1.5 bg-background/80 hover:bg-background rounded-full transition-colors shadow-sm"
+                aria-label={`Remove image ${idx + 1}`}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Left Arrow */}
+        {safeIndex > 0 && (
+          <button
+            type="button"
+            onClick={goToPrev}
+            aria-label="Previous image"
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-background/85 hover:bg-background text-foreground backdrop-blur-md border border-border/50 shadow-md flex items-center justify-center transition-all duration-200 active:scale-95"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+        )}
+
+        {/* Right Arrow */}
+        {safeIndex < previews.length - 1 && (
+          <button
+            type="button"
+            onClick={goToNext}
+            aria-label="Next image"
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-background/85 hover:bg-background text-foreground backdrop-blur-md border border-border/50 shadow-md flex items-center justify-center transition-all duration-200 active:scale-95"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Dot indicators */}
+      {previews.length > 1 && (
+        <div className="flex items-center justify-center gap-1.5">
+          {previews.map((_, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={(e) => { e.preventDefault(); setActiveIndex(idx); }}
+              aria-label={`Go to image ${idx + 1}`}
+              className={cn(
+                "rounded-full transition-all duration-300",
+                idx === safeIndex
+                  ? "w-5 h-1.5 bg-gold"
+                  : "w-1.5 h-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/60"
+              )}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Footer: info + add more + clear all */}
+      <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+        <span>
+          {previews.length === 1
+            ? "The first image will be used as the prompt cover"
+            : "The first image will be used as the prompt cover"}
+        </span>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {previews.length < 4 && (
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); onAddMore(); }}
+              className="flex items-center gap-1 hover:text-foreground transition-colors"
+            >
+              <Plus className="h-3 w-3" />
+              Add ({previews.length}/4)
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); onClearAll(); }}
+            className="hover:text-destructive transition-colors"
+          >
+            Clear all
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

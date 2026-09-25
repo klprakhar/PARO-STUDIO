@@ -89,6 +89,7 @@ export default function Profile() {
           id: p.id,
           title: p.title,
           imageUrl: p.imageUrl,
+          imageUrls: p.imageUrls,
           toolUsed: p.toolUsed,
           viewCount: p.viewCount || 0,
           copyCount: p.copyCount || 0,
@@ -307,6 +308,7 @@ export default function Profile() {
                       id={prompt.id}
                       title={prompt.title}
                       imageUrl={prompt.imageUrl}
+                      imageUrls={prompt.imageUrls}
                       toolUsed={prompt.toolUsed}
                       viewCount={prompt.viewCount}
                       copyCount={prompt.copyCount}

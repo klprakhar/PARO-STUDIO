@@ -94,6 +94,7 @@ export interface Prompt {
   title: string;
   prompt: string;
   image_url: string;
+  image_urls?: string[] | null;
   ai_tool: string;
   tags?: string[];
   view_count?: number;
@@ -103,11 +104,48 @@ export interface Prompt {
   updated_at?: string;
 }
 
+/**
+ * Returns an array of 4 images for a prompt carousel.
+ * If multiple imageUrls are available, returns up to 4 images.
+ * If a single imageUrl is present, provides 4 images for the carousel.
+ */
+export function getPromptImages(imageUrl?: string | null, imageUrls?: string[] | null): string[] {
+  if (imageUrls && imageUrls.length > 0) {
+    const valid = imageUrls.filter(Boolean);
+    if (valid.length > 0) return valid.slice(0, 4);
+  }
+  if (imageUrl) {
+    // If multiple URLs are packed into image_url with ||| separator
+    if (imageUrl.includes('|||')) {
+      const parts = imageUrl.split('|||').map(s => s.trim()).filter(Boolean);
+      if (parts.length > 0) return parts.slice(0, 4);
+    }
+    // For seed / demo images (e.g. from picsum.photos), provide 4 distinct variations
+    // so the carousel effect and arrows work for feed demonstration
+    if (imageUrl.includes('picsum.photos')) {
+      const seedMatch = imageUrl.match(/seed\/([^/]+)\/(\d+)\/(\d+)/);
+      if (seedMatch) {
+        const [, baseSeed, w, h] = seedMatch;
+        return [
+          imageUrl,
+          `https://picsum.photos/seed/${baseSeed}-b/${w}/${h}`,
+          `https://picsum.photos/seed/${baseSeed}-c/${w}/${h}`,
+          `https://picsum.photos/seed/${baseSeed}-d/${w}/${h}`,
+        ];
+      }
+    }
+    return [imageUrl];
+  }
+  return [];
+}
+
+
 export interface CreatePromptData {
   user_id: string;
   title: string;
   prompt: string;
   image_url: string;
+  image_urls?: string[];
   ai_tool: string;
   tags?: string[];
 }
@@ -117,18 +155,43 @@ export interface CreatePromptData {
  * CRITICAL: user_id must be explicitly passed and match auth.uid() for RLS
  */
 export async function createPrompt(data: CreatePromptData) {
-  const { data: prompt, error } = await supabase
+  // Pack multiple image URLs into image_url using '|||' delimiter
+  // This guarantees all uploaded images are preserved even if the database
+  // instance does not have the image_urls text[] column added yet.
+  const joinedImageUrl = data.image_urls && data.image_urls.length > 1
+    ? data.image_urls.join('|||')
+    : data.image_url;
+
+  const insertPayload: Record<string, unknown> = {
+    user_id: data.user_id,
+    title: data.title,
+    prompt: data.prompt,
+    image_url: joinedImageUrl,
+    ai_tool: data.ai_tool,
+    tags: data.tags || [],
+  };
+
+  if (data.image_urls && data.image_urls.length > 0) {
+    insertPayload.image_urls = data.image_urls;
+  }
+
+  let { data: prompt, error } = await supabase
     .from('prompts')
-    .insert([{
-      user_id: data.user_id,
-      title: data.title,
-      prompt: data.prompt,
-      image_url: data.image_url,
-      ai_tool: data.ai_tool,
-      tags: data.tags || []
-    }])
+    .insert([insertPayload as any])
     .select()
     .single();
+
+  // If the database instance hasn't applied the image_urls column yet, retry cleanly without it
+  if (error && (error.message?.includes('image_urls') || error.code === '42703')) {
+    delete insertPayload.image_urls;
+    const retry = await supabase
+      .from('prompts')
+      .insert([insertPayload as any])
+      .select()
+      .single();
+    prompt = retry.data;
+    error = retry.error;
+  }
 
   if (error) {
     console.error('❌ createPrompt: Insert failed:', {
@@ -233,7 +296,40 @@ export async function getUserPrompts(
     return { prompts: [], error };
   }
 
+<<<<<<< HEAD
   return { prompts: (data || []).map(normalizePromptRow), error: null };
+=======
+  // Normalize to camelCase (match PromptWithDetails shape)
+  const normalizedPrompts: NormalizedPrompt[] = (data || []).map(p => {
+    const raw = p as Record<string, unknown>;
+    let rawUrls = Array.isArray(raw.image_urls) ? (raw.image_urls as string[]) : undefined;
+    let firstImageUrl = p.image_url;
+
+    if (typeof p.image_url === 'string' && p.image_url.includes('|||')) {
+      const parts = p.image_url.split('|||').map(s => s.trim()).filter(Boolean);
+      firstImageUrl = parts[0];
+      if (!rawUrls || rawUrls.length === 0) {
+        rawUrls = parts;
+      }
+    }
+
+    return {
+      id: p.id,
+      userId: p.user_id,
+      title: p.title,
+      promptText: p.prompt,
+      imageUrl: firstImageUrl,
+      ...(rawUrls && rawUrls.length > 0 ? { imageUrls: rawUrls } : {}),
+      toolUsed: p.ai_tool,
+      tags: p.tags || [],
+      createdAt: p.created_at,
+      viewCount: p.view_count || 0,
+      copyCount: p.copy_count || 0,
+    };
+  });
+
+  return { prompts: normalizedPrompts, error: null };
+>>>>>>> b08456c (added corousel)
 }
 
 /**
@@ -257,6 +353,7 @@ export async function getAllPrompts(
     return { prompts: [], error };
   }
 
+<<<<<<< HEAD
   return { prompts: (data || []).map(normalizePromptRow), error: null };
 }
 
@@ -335,6 +432,39 @@ export async function searchPrompts(
   }
 
   const normalizedPrompts: NormalizedPrompt[] = (data || []).map(normalizePromptRow);
+<<<<<<< HEAD
+=======
+=======
+  // Normalize to camelCase (match PromptWithDetails shape)
+  const normalizedPrompts: NormalizedPrompt[] = (data || []).map(p => {
+    const raw = p as Record<string, unknown>;
+    let rawUrls = Array.isArray(raw.image_urls) ? (raw.image_urls as string[]) : undefined;
+    let firstImageUrl = p.image_url;
+
+    if (typeof p.image_url === 'string' && p.image_url.includes('|||')) {
+      const parts = p.image_url.split('|||').map(s => s.trim()).filter(Boolean);
+      firstImageUrl = parts[0];
+      if (!rawUrls || rawUrls.length === 0) {
+        rawUrls = parts;
+      }
+    }
+
+    return {
+      id: p.id,
+      userId: p.user_id,
+      title: p.title,
+      promptText: p.prompt,
+      imageUrl: firstImageUrl,
+      ...(rawUrls && rawUrls.length > 0 ? { imageUrls: rawUrls } : {}),
+      toolUsed: p.ai_tool,
+      tags: p.tags || [],
+      createdAt: p.created_at,
+      viewCount: p.view_count || 0,
+      copyCount: p.copy_count || 0,
+    };
+  });
+>>>>>>> b08456c (added corousel)
+>>>>>>> c2b9fc0 (Add full-text search and tag indexes and search on the server (fixes #102))
 
   return { prompts: normalizedPrompts, error: null };
 }

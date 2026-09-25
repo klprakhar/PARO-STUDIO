@@ -81,6 +81,7 @@ describe("PromptCard", () => {
     expect(cardContainer).toBeInTheDocument();
   });
 
+<<<<<<< HEAD
   it("renders view count stat when viewCount is provided", () => {
     renderPromptCard({
       ...baseProps,
@@ -105,5 +106,16 @@ describe("PromptCard", () => {
     fireEvent.click(screen.getAllByLabelText(label)[0]);
 
     expect(onLoginRequired).toHaveBeenCalledTimes(1);
+=======
+  it("renders 4 carousel pagination dots and advances image on next arrow click", () => {
+    renderPromptCard(baseProps);
+
+    const dots = screen.getAllByLabelText(/Go to image \d of 4/);
+    expect(dots).toHaveLength(4);
+    expect(dots[0]).toHaveAttribute("aria-current", "true");
+
+    const nextBtn = screen.getByLabelText("Next image");
+    expect(nextBtn).toBeInTheDocument();
+>>>>>>> b08456c (added corousel)
   });
 });

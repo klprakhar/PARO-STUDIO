@@ -14,6 +14,7 @@ export interface PromptWithDetails {
   id: string;
   title: string;
   imageUrl: string;
+  imageUrls?: string[];
   toolUsed: string;
   viewCount: number;
   copyCount: number;
@@ -117,6 +118,7 @@ export function usePrompts(options?: {
           id: p.id,
           title: p.title,
           imageUrl: p.imageUrl,
+          imageUrls: p.imageUrls,
           toolUsed: p.toolUsed,
           viewCount: p.viewCount || 0,
           copyCount: p.copyCount || 0,

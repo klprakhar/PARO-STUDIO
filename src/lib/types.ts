@@ -20,6 +20,7 @@ export interface NormalizedPrompt {
   userId: string;
   title: string;
   imageUrl: string;
+  imageUrls?: string[];
   toolUsed: string;
   tags: string[];
   createdAt: string;
@@ -28,3 +29,4 @@ export interface NormalizedPrompt {
   accuracyRating?: number;
   ratingCount?: number;
 }
+
